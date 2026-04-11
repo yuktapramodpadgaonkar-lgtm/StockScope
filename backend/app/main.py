@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.analysis_fundamental import router as analysis_fundamental_router
 from app.api.market_movers import router as market_movers_router
 from app.core.config import settings
 
@@ -17,6 +18,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.include_router(analysis_fundamental_router)
 app.include_router(market_movers_router)
 
 
