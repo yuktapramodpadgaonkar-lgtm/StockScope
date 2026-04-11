@@ -1,0 +1,10 @@
+# Install only inside the project venv — see README.md (Isolated Python environment).
+fastapi
+uvicorn
+pydantic
+pydantic-settings
+httpx
+pandas
+yfinance
+python-dotenv
+lxml
