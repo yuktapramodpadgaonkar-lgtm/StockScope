@@ -28,6 +28,18 @@ export default function Home() {
         >
           Fundamental analysis
         </Link>
+        <Link
+          href="/chatbot"
+          className="rounded-lg border border-emerald-500/40 bg-emerald-950/30 px-5 py-2.5 text-sm font-semibold text-emerald-300 shadow-lg shadow-emerald-900/20 transition hover:border-emerald-400/60 hover:bg-emerald-950/50"
+        >
+          Chatbot
+        </Link>
+        <Link
+          href="/history"
+          className="rounded-lg border border-emerald-500/40 bg-emerald-950/30 px-5 py-2.5 text-sm font-semibold text-emerald-300 shadow-lg shadow-emerald-900/20 transition hover:border-emerald-400/60 hover:bg-emerald-950/50"
+        >
+          History
+        </Link>
         <a
           href="http://127.0.0.1:8000/docs"
           target="_blank"
