@@ -11,8 +11,8 @@ export default function Home() {
           CMPE-258 research platform
         </h1>
         <p className="mt-4 text-lg text-slate-400">
-          Browse market movers backed by the FastAPI service. More modules (buy/sell,
-          chat) plug in here as your team ships them.
+          Browse market movers and fundamental analysis backed by the FastAPI service.
+          More modules (buy/sell, chat) plug in here as your team ships them.
         </p>
       </div>
       <div className="flex flex-wrap gap-4">
@@ -21,6 +21,12 @@ export default function Home() {
           className="rounded-lg bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-slate-950 shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-400"
         >
           Open Market Movers
+        </Link>
+        <Link
+          href="/fundamentals"
+          className="rounded-lg border border-emerald-500/40 bg-emerald-950/30 px-5 py-2.5 text-sm font-semibold text-emerald-300 shadow-lg shadow-emerald-900/20 transition hover:border-emerald-400/60 hover:bg-emerald-950/50"
+        >
+          Fundamental analysis
         </Link>
         <a
           href="http://127.0.0.1:8000/docs"
