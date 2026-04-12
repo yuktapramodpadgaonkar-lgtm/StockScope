@@ -11,8 +11,9 @@ export default function Home() {
           CMPE-258 research platform
         </h1>
         <p className="mt-4 text-lg text-slate-400">
-          Browse market movers and fundamental analysis backed by the FastAPI service.
-          More modules (buy/sell, chat) plug in here as your team ships them.
+          Explore market movers, fundamentals, chat, and history—wired to a shared FastAPI
+          backend. Use the links below to try each module; buy/sell and deeper AI features
+          will layer in as the course project grows.
         </p>
       </div>
       <div className="flex flex-wrap gap-4">
