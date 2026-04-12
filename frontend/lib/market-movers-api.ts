@@ -1,3 +1,5 @@
+import { getApiBase } from "@/lib/auth-api";
+
 export type Universe = "all" | "sp500" | "dow30" | "nasdaq100" | "russell1000";
 export type TimeMode = "intraday" | "previous_day";
 export type MoverType = "gainers" | "losers" | "52w_high" | "52w_low";
@@ -23,11 +25,6 @@ export type MarketMoversResponse = {
   count: number;
   items: MarketMoverItem[];
 };
-
-function getApiBase(): string {
-  const base = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000";
-  return base.replace(/\/$/, "");
-}
 
 export async function fetchMarketMovers(params: {
   universe: Universe;
