@@ -12,6 +12,8 @@ export type FundamentalMetrics = {
   dividend_yield_pct: number | null;
 };
 
+import { getApiBase } from "@/lib/auth-api";
+
 export type FundamentalAnalysisResponse = {
   ticker: string;
   company_name: string;
@@ -24,11 +26,6 @@ export type FundamentalAnalysisResponse = {
   verdict: string;
   disclaimer: string;
 };
-
-function getApiBase(): string {
-  const base = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000";
-  return base.replace(/\/$/, "");
-}
 
 export async function fetchFundamentalAnalysis(ticker: string): Promise<FundamentalAnalysisResponse> {
   const url = new URL(`${getApiBase()}/api/analysis/fundamental`);

@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   fetchMarketMovers,
@@ -171,15 +170,7 @@ export function MarketMoversView() {
       <header className="border-b border-slate-800/80 bg-slate-950/80 backdrop-blur">
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-6 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
           <div>
-            <Link
-              href="/"
-              className="text-sm font-medium text-emerald-400/90 hover:text-emerald-300"
-            >
-              ← Home
-            </Link>
-            <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white">
-              Market movers
-            </h1>
+            <h1 className="text-2xl font-semibold tracking-tight text-white">Market movers</h1>
             <p className="mt-1 text-sm text-slate-400">
               Rankings from your FastAPI backend (cached server-side later). Data is for
               research only—not financial advice. Table order follows the server for each
