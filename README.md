@@ -43,7 +43,7 @@ StockScope addresses this by building an **evaluation-driven AI system** that co
 - Displays top gainers and losers
 - Shows price, percentage change, and volume
 - Interactive table UI for quick exploration
-  Market movers (API, yfinance, ranking, caching): see docs/MARKET_MOVERS.md.
+- Market movers (API, yfinance, ranking, caching): see docs/MARKET_MOVERS.md.
 ---
 
 ### 2. Fundamental Analysis
