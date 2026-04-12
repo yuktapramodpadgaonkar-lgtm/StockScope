@@ -1,11 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { HistoryList } from "@/components/HistoryList";
 import { fetchHistory } from "@/lib/revati-api";
-import type { HistoryResponse } from "@/lib/revati-types";
+import type {
+  ChatHistoryItem,
+  HistoryResponse,
+  ResearchHistoryItem,
+  SavedPromptItem,
+} from "@/lib/revati-types";
 
 export default function HistoryPage() {
   const [data, setData] = useState<HistoryResponse | null>(null);
@@ -17,7 +22,10 @@ export default function HistoryPage() {
     (async () => {
       try {
         const h = await fetchHistory();
-        if (!cancelled) setData(h);
+        if (!cancelled) {
+          setData(h);
+          setError(null);
+        }
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load history");
       } finally {
@@ -28,6 +36,36 @@ export default function HistoryPage() {
       cancelled = true;
     };
   }, []);
+
+  const chatRows = useMemo(
+    () =>
+      (data?.chat_history ?? []).map((c: ChatHistoryItem) => ({
+        id: c.thread_id,
+        title: c.title,
+        subtitle: `Updated ${c.last_updated} · ${c.thread_id}`,
+      })),
+    [data],
+  );
+
+  const researchRows = useMemo(
+    () =>
+      (data?.research_history ?? []).map((r: ResearchHistoryItem) => ({
+        id: r.id,
+        title: `${r.type} · ${r.ticker}`,
+        subtitle: r.created_at,
+      })),
+    [data],
+  );
+
+  const promptRows = useMemo(
+    () =>
+      (data?.saved_prompts ?? []).map((p: SavedPromptItem) => ({
+        id: p.id,
+        title: p.title,
+        subtitle: p.prompt_text,
+      })),
+    [data],
+  );
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-950 to-slate-900">
@@ -46,44 +84,16 @@ export default function HistoryPage() {
       <div className="mx-auto max-w-3xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
         {error ? <p className="text-sm text-rose-400">{error}</p> : null}
 
-        <HistoryList
-          title="Chat history"
-          loading={loading}
-          rows={
-            data?.chat_history.map((c) => ({
-              id: c.thread_id,
-              title: c.title,
-              subtitle: `Updated ${c.last_updated} · ${c.thread_id}`,
-            })) ?? []
-          }
-          emptyMessage="No chat threads yet."
-        />
+        <HistoryList title="Chat history" loading={loading} rows={chatRows} emptyMessage="No chat threads yet." />
 
         <HistoryList
           title="Research history"
           loading={loading}
-          rows={
-            data?.research_history.map((r) => ({
-              id: r.id,
-              title: `${r.type} · ${r.ticker}`,
-              subtitle: r.created_at,
-            })) ?? []
-          }
+          rows={researchRows}
           emptyMessage="No research runs yet."
         />
 
-        <HistoryList
-          title="Saved prompts"
-          loading={loading}
-          rows={
-            data?.saved_prompts.map((p) => ({
-              id: p.id,
-              title: p.title,
-              subtitle: p.prompt_text,
-            })) ?? []
-          }
-          emptyMessage="No saved prompts yet."
-        />
+        <HistoryList title="Saved prompts" loading={loading} rows={promptRows} emptyMessage="No saved prompts yet." />
       </div>
     </div>
   );
