@@ -9,6 +9,7 @@ router = APIRouter(prefix="/api/history", tags=["History"])
 
 
 @router.get("", response_model=HistoryResponse)
+@router.get("/", response_model=HistoryResponse)
 def get_history() -> HistoryResponse:
     """
     Return sample chat, research, and saved-prompt records.
