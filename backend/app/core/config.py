@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     market_data_provider: str = "yfinance"
     finnhub_api_key: str = ""
     alpha_vantage_api_key: str = ""
+    # Optional — advanced valuation / transcripts later (Layer 1 MVP does not call FMP).
+    fmp_api_key: str = ""
 
     # Comma-separated origins for browser access to the API (Next.js dev server).
     cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"

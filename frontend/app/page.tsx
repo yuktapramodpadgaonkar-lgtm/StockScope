@@ -18,6 +18,12 @@ export default function Home() {
       </div>
       <div className="flex flex-wrap gap-4">
         <Link
+          href="/buy-sell"
+          className="rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-emerald-600/25 transition hover:bg-emerald-500"
+        >
+          Buy / Sell report (mock)
+        </Link>
+        <Link
           href="/market-movers"
           className="rounded-lg bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-slate-950 shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-400"
         >

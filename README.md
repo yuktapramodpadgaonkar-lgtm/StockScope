@@ -229,6 +229,12 @@ Ensure `backend/.env` contains:
 
 CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
 
+### 🔑 API Keys
+
+6. **API keys** (Alpha Vantage, Finnhub, Polygon for scripts, etc.): copy
+   `backend/.env.example` to `backend/.env` and see [`docs/API-keys.md`](docs/API-keys.md).
+   To test that keys work for a stock, see [`docs/API-keys-testing.md`](docs/API-keys-testing.md).
+
 ---
 
 ### 🌐 Frontend Setup
