@@ -16,6 +16,14 @@ class Settings(BaseSettings):
     alpha_vantage_api_key: str = ""
     # Optional — advanced valuation / transcripts later (Layer 1 MVP does not call FMP).
     fmp_api_key: str = ""
+    # Buy/Sell LLM review (Phase 4)
+    buysell_llm_provider: str = "none"  # none | huggingface
+    buysell_llm_enabled: bool = False
+    buysell_llm_model: str = ""  # e.g. FinGPT model id on Hugging Face
+    buysell_llm_timeout_seconds: int = 45
+    huggingface_api_token: str = ""
+    hf_model_id: str = ""
+    hf_inference_url: str = ""  # optional dedicated endpoint URL
 
     # Comma-separated origins for browser access to the API (Next.js dev server).
     cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"

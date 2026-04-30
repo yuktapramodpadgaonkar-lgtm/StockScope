@@ -3,6 +3,8 @@ from __future__ import annotations
 from statistics import pstdev
 from typing import Any
 
+from app.core.config import settings
+from app.services.huggingface_llm import generate_hf_llm_review
 from app.schemas.buy_sell_analysis import (
     BuySellReport,
     CitationItem,
@@ -325,6 +327,43 @@ def _llm_review_stub(
     )
 
 
+def _build_llm_review(
+    ticker: str,
+    overall: OverallRuleScore,
+    f: DimensionRuleScore,
+    t: DimensionRuleScore,
+    s: DimensionRuleScore,
+    *,
+    include_llm_review: bool,
+) -> LlmReview:
+    if not include_llm_review:
+        return _llm_review_stub(overall, f, t, s, enabled=False)
+
+    if not settings.buysell_llm_enabled:
+        out = _llm_review_stub(overall, f, t, s, enabled=True)
+        out.warnings = out.warnings + ["BUYSELL_LLM_ENABLED=false; returning deterministic mirror."]
+        return out
+
+    provider = (settings.buysell_llm_provider or "none").strip().lower()
+    if provider != "huggingface":
+        out = _llm_review_stub(overall, f, t, s, enabled=True)
+        out.warnings = out.warnings + [f"Unsupported provider '{provider}'. Set BUYSELL_LLM_PROVIDER=huggingface."]
+        return out
+
+    try:
+        return generate_hf_llm_review(
+            ticker=ticker,
+            overall=overall,
+            fundamental=f,
+            technical=t,
+            sentiment=s,
+        )
+    except Exception as e:
+        out = _llm_review_stub(overall, f, t, s, enabled=True)
+        out.warnings = out.warnings + [f"HuggingFace review failed: {str(e)[:220]}"]
+        return out
+
+
 def build_buy_sell_report_from_layer1(
     ticker: str,
     bundle: dict[str, Any],
@@ -377,7 +416,14 @@ def build_buy_sell_report_from_layer1(
         ),
     ]
 
-    llm_review = _llm_review_stub(overall, f, t, s, enabled=include_llm_review)
+    llm_review = _build_llm_review(
+        ticker=ticker.upper(),
+        overall=overall,
+        f=f,
+        t=t,
+        s=s,
+        include_llm_review=include_llm_review,
+    )
 
     return BuySellReport(
         ticker=ticker.upper(),
