@@ -17,6 +17,8 @@
     "technical_analysis",
     "sentiment_analysis",
     "final_verdict",
+    "scoring_engine",
+    "llm_review",
     "risk_assessment",
     "citations",
     "disclaimer"
@@ -41,6 +43,8 @@
     "fundamental_analysis": { "$ref": "#/$defs/fundamental_analysis" },
     "technical_analysis": { "$ref": "#/$defs/technical_analysis" },
     "sentiment_analysis": { "$ref": "#/$defs/sentiment_analysis" },
+    "scoring_engine": { "$ref": "#/$defs/scoring_engine" },
+    "llm_review": { "$ref": "#/$defs/llm_review" },
     "final_verdict": {
       "type": "object",
       "additionalProperties": false,
@@ -160,6 +164,112 @@
           "items": { "type": "string" }
         },
         "verdict": { "type": "string" }
+      }
+    },
+    "score_signal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "value", "points", "reason"],
+      "properties": {
+        "name": { "type": "string" },
+        "value": { "type": ["number", "string", "null"] },
+        "points": { "type": "number" },
+        "reason": { "type": "string" }
+      }
+    },
+    "dimension_rule_score": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["score", "max_score", "signals", "data_completeness"],
+      "properties": {
+        "score": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "max_score": { "type": "integer" },
+        "signals": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/score_signal" }
+        },
+        "data_completeness": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "scoring_engine": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "weights", "rule_scores", "overall"],
+      "properties": {
+        "version": { "type": "string" },
+        "weights": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["fundamental", "technical", "sentiment"],
+          "properties": {
+            "fundamental": { "type": "integer" },
+            "technical": { "type": "integer" },
+            "sentiment": { "type": "integer" }
+          }
+        },
+        "rule_scores": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["fundamental", "technical", "sentiment"],
+          "properties": {
+            "fundamental": { "$ref": "#/$defs/dimension_rule_score" },
+            "technical": { "$ref": "#/$defs/dimension_rule_score" },
+            "sentiment": { "$ref": "#/$defs/dimension_rule_score" }
+          }
+        },
+        "overall": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["weighted_score", "recommendation", "band", "confidence", "setup_quality"],
+          "properties": {
+            "weighted_score": { "type": "number", "minimum": 0, "maximum": 100 },
+            "recommendation": { "type": "string", "enum": ["BUY", "HOLD", "SELL"] },
+            "band": { "type": "string" },
+            "confidence": { "type": "integer", "minimum": 0, "maximum": 100 },
+            "setup_quality": { "type": "integer", "minimum": 0, "maximum": 100 }
+          }
+        }
+      }
+    },
+    "llm_review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "model",
+        "llm_score_suggestion",
+        "agreement_with_rules",
+        "rationale",
+        "warnings",
+        "citations_used"
+      ],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "model": { "type": "string" },
+        "llm_score_suggestion": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["fundamental", "technical", "sentiment", "overall", "recommendation"],
+          "properties": {
+            "fundamental": { "type": "integer", "minimum": 0, "maximum": 100 },
+            "technical": { "type": "integer", "minimum": 0, "maximum": 100 },
+            "sentiment": { "type": "integer", "minimum": 0, "maximum": 100 },
+            "overall": { "type": "integer", "minimum": 0, "maximum": 100 },
+            "recommendation": { "type": "string", "enum": ["BUY", "HOLD", "SELL"] }
+          }
+        },
+        "agreement_with_rules": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["matches_recommendation", "overall_score_delta"],
+          "properties": {
+            "matches_recommendation": { "type": "boolean" },
+            "overall_score_delta": { "type": "integer" }
+          }
+        },
+        "rationale": { "type": "string" },
+        "warnings": { "type": "array", "items": { "type": "string" } },
+        "citations_used": { "type": "array", "items": { "type": "string" } }
       }
     }
   }
