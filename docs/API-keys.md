@@ -36,6 +36,11 @@ Keys are read as environment variables (e.g. `ALPHA_VANTAGE_API_KEY`, `FINNHUB_A
 | `ALPHA_VANTAGE_API_KEY` | Buy/Sell Layer 1 — `NEWS_SENTIMENT` (news + sentiment), **1 call per ticker** when set | Optional |
 | `FINNHUB_API_KEY` | Buy/Sell Layer 1 — analyst recommendation **trends** (`/stock/recommendation`), **1 call per ticker** when set | Optional |
 | `FMP_API_KEY` | Reserved for future use (e.g. DCF / statements). **Not called** by Layer 1 yet | Optional |
+| `BUYSELL_LLM_PROVIDER` | Buy/Sell Phase 4 provider switch (`none` or `huggingface`) | Optional |
+| `BUYSELL_LLM_ENABLED` | Enables advisory `llm_review` generation in `/api/buy-sell/analyze/{ticker}` | Optional |
+| `HUGGINGFACE_API_TOKEN` | Hugging Face auth token for generic API or endpoint mode | Optional (required when HF enabled) |
+| `HF_MODEL_ID` | Hugging Face model id for generic inference API mode | Optional (required if `HF_INFERENCE_URL` is empty) |
+| `HF_INFERENCE_URL` | Dedicated HF endpoint URL (if set, used instead of generic model-id route) | Optional |
 | `POLYGON_API_KEY` | **Not used by the FastAPI server.** Used only by **Python scripts** under `scripts/` (see below) | Optional unless you run those scripts with Polygon enrichment |
 | `MOVERS_CACHE_*` | Market movers snapshot cache TTLs | Optional (defaults exist) |
 

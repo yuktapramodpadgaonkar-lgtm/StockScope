@@ -90,6 +90,70 @@ class RiskAssessment(BaseModel):
     action_plan: RiskActionPlan = Field(default_factory=RiskActionPlan)
 
 
+class ScoreSignal(BaseModel):
+    name: str
+    value: float | str | None = None
+    points: float = 0.0
+    reason: str = ""
+
+
+class DimensionRuleScore(BaseModel):
+    score: int = Field(0, ge=0, le=100)
+    max_score: int = 100
+    signals: list[ScoreSignal] = Field(default_factory=list)
+    data_completeness: float = Field(0.0, ge=0.0, le=1.0)
+
+
+class RuleScores(BaseModel):
+    fundamental: DimensionRuleScore = Field(default_factory=DimensionRuleScore)
+    technical: DimensionRuleScore = Field(default_factory=DimensionRuleScore)
+    sentiment: DimensionRuleScore = Field(default_factory=DimensionRuleScore)
+
+
+class ScoreWeights(BaseModel):
+    fundamental: int = 40
+    technical: int = 30
+    sentiment: int = 30
+
+
+class OverallRuleScore(BaseModel):
+    weighted_score: float = Field(0.0, ge=0.0, le=100.0)
+    recommendation: Recommendation = Recommendation.HOLD
+    band: str = "55-74"
+    confidence: int = Field(0, ge=0, le=100)
+    setup_quality: int = Field(0, ge=0, le=100)
+
+
+class ScoringEngineBlock(BaseModel):
+    version: str = "phase3-rules-v1"
+    weights: ScoreWeights = Field(default_factory=ScoreWeights)
+    rule_scores: RuleScores = Field(default_factory=RuleScores)
+    overall: OverallRuleScore = Field(default_factory=OverallRuleScore)
+
+
+class LlmScoreSuggestion(BaseModel):
+    fundamental: int = Field(0, ge=0, le=100)
+    technical: int = Field(0, ge=0, le=100)
+    sentiment: int = Field(0, ge=0, le=100)
+    overall: int = Field(0, ge=0, le=100)
+    recommendation: Recommendation = Recommendation.HOLD
+
+
+class LlmAgreement(BaseModel):
+    matches_recommendation: bool = True
+    overall_score_delta: int = 0
+
+
+class LlmReview(BaseModel):
+    enabled: bool = False
+    model: str = "not_configured"
+    llm_score_suggestion: LlmScoreSuggestion = Field(default_factory=LlmScoreSuggestion)
+    agreement_with_rules: LlmAgreement = Field(default_factory=LlmAgreement)
+    rationale: str = ""
+    warnings: list[str] = Field(default_factory=list)
+    citations_used: list[str] = Field(default_factory=list)
+
+
 class BuySellReport(BaseModel):
     schema_version: str = SCHEMA_VERSION
     ticker: str
@@ -103,6 +167,8 @@ class BuySellReport(BaseModel):
     sentiment_analysis: SentimentAnalysis = Field(default_factory=SentimentAnalysis)
     final_verdict: FinalVerdict = Field(default_factory=FinalVerdict)
     risk_assessment: RiskAssessment = Field(default_factory=RiskAssessment)
+    scoring_engine: ScoringEngineBlock = Field(default_factory=ScoringEngineBlock)
+    llm_review: LlmReview = Field(default_factory=LlmReview)
     citations: list[CitationItem] = Field(default_factory=list)
     disclaimer: str = Field(
         default=(
@@ -190,6 +256,30 @@ def mock_buy_sell_report() -> BuySellReport:
                 if_you_own="Consider position sizing vs portfolio risk; trail stops or rebalance on strength.",
                 if_you_want_to_buy="Scale in over time; pair entry with predefined downside tolerance.",
             ),
+        ),
+        scoring_engine=ScoringEngineBlock(
+            overall=OverallRuleScore(
+                weighted_score=72.0,
+                recommendation=Recommendation.BUY,
+                band="55-74",
+                confidence=78,
+                setup_quality=72,
+            )
+        ),
+        llm_review=LlmReview(
+            enabled=False,
+            model="not_configured",
+            llm_score_suggestion=LlmScoreSuggestion(
+                fundamental=76,
+                technical=71,
+                sentiment=68,
+                overall=72,
+                recommendation=Recommendation.BUY,
+            ),
+            agreement_with_rules=LlmAgreement(matches_recommendation=True, overall_score_delta=0),
+            rationale="LLM review is disabled in the mock path; values mirror deterministic scores.",
+            warnings=["Set up an LLM client to enable advisory review."],
+            citations_used=["c1", "c2"],
         ),
         citations=[
             CitationItem(

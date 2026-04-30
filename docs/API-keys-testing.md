@@ -130,3 +130,27 @@ Expect `items` with symbols and quote fields.
 | Polygon | Script + `POLYGON_API_KEY` in env, not the Buy/Sell JSON route |
 
 For key placement, see [`API-keys.md`](API-keys.md).
+
+---
+
+## 7. Phase 4 LLM review (Hugging Face)
+
+Set these in `backend/.env`:
+
+- `BUYSELL_LLM_PROVIDER=huggingface`
+- `BUYSELL_LLM_ENABLED=true`
+- `HUGGINGFACE_API_TOKEN=...`
+- For generic API mode: `HF_MODEL_ID=...`
+- For endpoint mode (later): `HF_INFERENCE_URL=...` (if set, it takes priority)
+
+Test call:
+
+```powershell
+curl.exe -s "http://127.0.0.1:8000/api/buy-sell/analyze/AAPL?include_llm_review=true"
+```
+
+Check response:
+
+- `llm_review.enabled` should be `true` when HF call succeeds
+- `llm_review.model` should show your HF model/endpoint
+- If HF is not configured/fails, response still returns deterministic scores with warnings in `llm_review.warnings`
