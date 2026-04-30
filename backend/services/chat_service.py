@@ -1,19 +1,19 @@
-"""
-Week 1 stub chat: keyword intent routing and canned structured responses.
-
-TODO: Replace with LangGraph / agent orchestration and grounded retrieval (RAG).
-"""
+"""Chat service with lightweight routing + evidence-aware responses."""
 
 from __future__ import annotations
 
 import re
 import uuid
 from datetime import datetime, timezone
+
 from app.schemas.chat import ChatCitation, ChatIntent, ChatQueryResponse
+from services.history_service import get_history, save_chat_interaction
+from services.news_sentiment_service import build_news_sentiment_report
 
 _DISCLAIMER = (
     "This response is for educational purposes only and is not financial advice."
 )
+_TICKER_RE = re.compile(r"\b[A-Z]{1,5}\b")
 
 
 def _utc_now_iso() -> str:
@@ -28,6 +28,8 @@ def _detect_intent(query: str) -> ChatIntent:
     padded = f" {q} "
     if any(m in padded for m in comparison_markers) or q.startswith("compare "):
         return "comparison_question"
+    if "history" in q or "previous" in q or "last time" in q:
+        return "history_lookup"
 
     sentiment_markers = (
         "sentiment",
@@ -69,27 +71,53 @@ def _mock_citations() -> list[ChatCitation]:
     ]
 
 
+def _extract_tickers(query: str) -> list[str]:
+    matches = [m.group(0) for m in _TICKER_RE.finditer(query.upper())]
+    dedup: list[str] = []
+    for m in matches:
+        if m in {"WHY", "WHAT", "HOW", "THE", "AND", "IS", "ARE"}:
+            continue
+        if m not in dedup:
+            dedup.append(m)
+    return dedup[:4]
+
+
 def _response_for_intent(
     intent: ChatIntent,
     query: str,
     thread_id: str,
     ts: str,
+    tickers: list[str],
 ) -> ChatQueryResponse:
     citations = _mock_citations()
+    primary_ticker = tickers[0] if tickers else "NVDA"
 
     if intent == "stock_explanation":
+        sentiment = build_news_sentiment_report(primary_ticker, None, None, max_articles=5)
+        citations = [
+            ChatCitation(
+                title=c.title,
+                url=c.url,
+                source=c.source,
+                published_at=c.published_at,
+            )
+            for c in sentiment.citations[:3]
+        ]
         return ChatQueryResponse(
             thread_id=thread_id,
             detected_intent=intent,
+            tickers=tickers,
             answer=(
-                "From a Week 1 stub perspective, the move is framed as a mix of "
-                "recent headlines and broad market momentum. Plug in real prices "
-                "and news when integrations land."
+                f"{primary_ticker} appears to be reacting to recent coverage that skews "
+                f"{sentiment.aggregate_sentiment.overall_label}. This explanation is "
+                "based on lightweight sentiment signals rather than full event attribution."
             ),
             summary_bullets=[
-                "Recent news coverage is summarized as supportive.",
-                "Price action is described qualitatively as showing momentum.",
-                "This is an educational explanation, not financial advice.",
+                f"Aggregate sentiment: {sentiment.aggregate_sentiment.positive}% positive / "
+                f"{sentiment.aggregate_sentiment.neutral}% neutral / "
+                f"{sentiment.aggregate_sentiment.negative}% negative.",
+                "Evidence is article-level and not a complete market microstructure analysis.",
+                "Educational explanation only; not financial advice.",
             ],
             citations=citations,
             disclaimer=_DISCLAIMER,
@@ -97,20 +125,30 @@ def _response_for_intent(
         )
 
     if intent == "sentiment_question":
+        sentiment = build_news_sentiment_report(primary_ticker, None, None, max_articles=5)
         return ChatQueryResponse(
             thread_id=thread_id,
             detected_intent=intent,
+            tickers=tickers,
             answer=(
-                "Sentiment is mocked as cautiously constructive: headlines skew "
-                "positive but dispersion remains. Use the dedicated news-sentiment "
-                "endpoint for structured article-level output."
+                f"Recent sentiment for {primary_ticker} is "
+                f"{sentiment.aggregate_sentiment.overall_label}. "
+                "Confidence is moderate because scoring is heuristic when model services are unavailable."
             ),
             summary_bullets=[
-                "Stub labels articles positive / neutral / negative.",
-                "Aggregate mix is informational only.",
-                "FinBERT + live feeds replace this in a later milestone.",
+                f"Major themes: {', '.join(sentiment.major_themes[:3])}.",
+                "Signal combines available news feed + fallback scoring.",
+                "Use with caution; not investment advice.",
             ],
-            citations=citations,
+            citations=[
+                ChatCitation(
+                    title=c.title,
+                    url=c.url,
+                    source=c.source,
+                    published_at=c.published_at,
+                )
+                for c in sentiment.citations[:3]
+            ],
             disclaimer=_DISCLAIMER,
             timestamp=ts,
         )
@@ -119,6 +157,7 @@ def _response_for_intent(
         return ChatQueryResponse(
             thread_id=thread_id,
             detected_intent=intent,
+            tickers=tickers,
             answer=(
                 f"You asked: “{query.strip()[:120]}”. Week 1 returns a placeholder "
                 "comparison narrative until fundamentals and peer data are wired in."
@@ -132,10 +171,29 @@ def _response_for_intent(
             disclaimer=_DISCLAIMER,
             timestamp=ts,
         )
+    if intent == "history_lookup":
+        hist = get_history()
+        recent = hist.chat_history[:3]
+        titles = "; ".join(x.title for x in recent) or "No recent threads found."
+        return ChatQueryResponse(
+            thread_id=thread_id,
+            detected_intent=intent,
+            tickers=tickers,
+            answer=f"I found {len(recent)} recent threads: {titles}",
+            summary_bullets=[
+                "History is persisted in a local JSON store for this course milestone.",
+                "Thread metadata includes title + last_updated timestamps.",
+                "TODO: Move to user-scoped DB records with auth controls.",
+            ],
+            citations=[],
+            disclaimer=_DISCLAIMER,
+            timestamp=ts,
+        )
 
     return ChatQueryResponse(
         thread_id=thread_id,
         detected_intent="unknown",
+        tickers=tickers,
         answer=(
             "I’m not sure how to classify that yet. Try rephrasing with a ticker, "
             "or ask about sentiment, a price move, or a comparison between two names."
@@ -165,4 +223,7 @@ def handle_chat_query(query: str, thread_id: str | None) -> ChatQueryResponse:
     tid = (thread_id or "").strip() or f"thread_{uuid.uuid4().hex[:12]}"
     ts = _utc_now_iso()
     intent: ChatIntent = _detect_intent(text)
-    return _response_for_intent(intent, text, tid, ts)
+    tickers = _extract_tickers(text)
+    response = _response_for_intent(intent, text, tid, ts, tickers)
+    save_chat_interaction(tid, text, response.answer)
+    return response
