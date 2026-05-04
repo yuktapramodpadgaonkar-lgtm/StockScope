@@ -38,11 +38,17 @@ Keys are read as environment variables (e.g. `ALPHA_VANTAGE_API_KEY`, `FINNHUB_A
 | `FMP_API_KEY` | Reserved for future use (e.g. DCF / statements). **Not called** by Layer 1 yet | Optional |
 | `BUYSELL_LLM_PROVIDER` | Buy/Sell Phase 4 provider switch (`none` or `huggingface`) | Optional |
 | `BUYSELL_LLM_ENABLED` | Enables advisory `llm_review` generation in `/api/buy-sell/analyze/{ticker}` | Optional |
-| `HUGGINGFACE_API_TOKEN` | Hugging Face auth token for generic API or endpoint mode | Optional (required when HF enabled) |
+| `HUGGINGFACE_API_TOKEN` | Hugging Face auth token for generic API or endpoint mode; **also used for Phase 5.1 RAG embeddings** when set | Optional (required when HF LLM or embedding retrieval is enabled) |
 | `HF_MODEL_ID` | Hugging Face model id for generic inference API mode | Optional (required if `HF_INFERENCE_URL` is empty) |
 | `HF_INFERENCE_URL` | Dedicated HF endpoint URL (if set, used instead of generic model-id route) | Optional |
+| `RAG_EMBEDDING_MODEL` | HF model id for **sentence embeddings** (feature extraction) used in hybrid retrieval | Optional (defaults in `backend/app/core/config.py`) |
+| `SEC_USER_AGENT` | **Required by SEC** for EDGAR HTTP access — descriptive string with contact (e.g. `MyApp/1.0 (you@school.edu)`) | Optional for filings; if unset, Layer 1 filings block stays empty |
+| `SEC_EDGAR_ENABLED` | When `true` and `SEC_USER_AGENT` is set, fetches recent 10-K / 10-Q / 8-K text into RAG | Optional |
 | `POLYGON_API_KEY` | **Not used by the FastAPI server.** Used only by **Python scripts** under `scripts/` (see below) | Optional unless you run those scripts with Polygon enrichment |
 | `MOVERS_CACHE_*` | Market movers snapshot cache TTLs | Optional (defaults exist) |
+| `MEMORY_ENABLED` | Phase 7 — persist session memory under `data/memory/sessions.json` | Optional (`true` by default in code) |
+| `MEMORY_MAX_RECENT_TICKERS` | Cap per session recent-ticker list | Optional |
+| `EVAL_OUTPUT_DIR` | Phase 8 — optional override for eval JSON output directory | Optional (default `data/eval/`) |
 
 ---
 

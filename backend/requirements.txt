@@ -8,3 +8,4 @@ pandas
 yfinance
 python-dotenv
 lxml
+numpy

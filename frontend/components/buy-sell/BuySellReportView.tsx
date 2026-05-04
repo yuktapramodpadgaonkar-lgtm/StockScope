@@ -307,6 +307,79 @@ export function BuySellReportView() {
               ))}
             </ul>
           </section>
+
+          {report.memory && (
+            <section className="rounded-2xl border border-sky-700/50 bg-sky-950/20 p-6">
+              <h2 className="text-lg font-semibold text-white">
+                Session memory <span className="text-xs font-normal text-sky-300">(Phase 7)</span>
+              </h2>
+              <p className="mt-1 font-mono text-xs text-slate-500">
+                session_id={report.memory.session_id}
+              </p>
+              {report.memory.preferred_horizon && (
+                <p className="mt-2 text-sm text-slate-300">
+                  Preferred horizon: {report.memory.preferred_horizon}
+                </p>
+              )}
+              {report.memory.recent_tickers.length > 0 && (
+                <p className="mt-2 text-sm text-slate-300">
+                  Recent tickers: {report.memory.recent_tickers.join(", ")}
+                </p>
+              )}
+              {report.memory.follow_up_context && (
+                <p className="mt-3 text-sm text-slate-400">{report.memory.follow_up_context}</p>
+              )}
+            </section>
+          )}
+
+          {report.agent_pipeline && (
+            <section className="rounded-2xl border border-violet-700/50 bg-violet-950/20 p-6">
+              <h2 className="text-lg font-semibold text-white">
+                Agent pipeline <span className="text-xs font-normal text-violet-300">(Phase 6)</span>
+              </h2>
+              <p className="mt-1 text-sm text-slate-400">{report.agent_pipeline.plan_summary}</p>
+              <div className="mt-4 flex flex-wrap gap-3 text-sm">
+                <span
+                  className={`rounded-lg px-2 py-1 ring-1 ${
+                    report.agent_pipeline.critic.passed
+                      ? "bg-emerald-500/15 text-emerald-200 ring-emerald-500/40"
+                      : "bg-amber-500/15 text-amber-200 ring-amber-500/40"
+                  }`}
+                >
+                  Critic: {report.agent_pipeline.critic.passed ? "passed" : "review"}
+                </span>
+                {report.agent_pipeline.critic.incomplete_evidence && (
+                  <span className="rounded-lg bg-rose-500/15 px-2 py-1 text-rose-200 ring-1 ring-rose-500/40">
+                    Incomplete evidence
+                  </span>
+                )}
+              </div>
+              {report.agent_pipeline.critic.flags.length > 0 && (
+                <ul className="mt-3 list-inside list-disc text-sm text-amber-200/90">
+                  {report.agent_pipeline.critic.flags.map((f) => (
+                    <li key={f}>{f}</li>
+                  ))}
+                </ul>
+              )}
+              <details className="mt-4 text-sm text-slate-400">
+                <summary className="cursor-pointer text-slate-300 hover:text-white">
+                  Execution trace ({report.agent_pipeline.execution_trace.length} steps)
+                </summary>
+                <ol className="mt-2 space-y-2 pl-4">
+                  {report.agent_pipeline.execution_trace.map((s) => (
+                    <li key={`${s.step_id}-${s.duration_ms}`}>
+                      <span className="font-mono text-xs text-slate-500">{s.status}</span>{" "}
+                      <span className="text-slate-300">{s.step_id}</span>
+                      <span className="text-slate-500"> · {s.duration_ms.toFixed(1)} ms</span>
+                      {s.detail && (
+                        <span className="block text-xs text-slate-500">{s.detail}</span>
+                      )}
+                    </li>
+                  ))}
+                </ol>
+              </details>
+            </section>
+          )}
         </div>
       )}
     </div>

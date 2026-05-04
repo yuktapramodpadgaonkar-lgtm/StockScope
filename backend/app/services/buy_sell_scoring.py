@@ -335,6 +335,7 @@ def _build_llm_review(
     s: DimensionRuleScore,
     *,
     include_llm_review: bool,
+    retrieval_chunks: list[dict[str, Any]] | None = None,
 ) -> LlmReview:
     if not include_llm_review:
         return _llm_review_stub(overall, f, t, s, enabled=False)
@@ -357,6 +358,7 @@ def _build_llm_review(
             fundamental=f,
             technical=t,
             sentiment=s,
+            retrieval_chunks=retrieval_chunks or [],
         )
     except Exception as e:
         out = _llm_review_stub(overall, f, t, s, enabled=True)
@@ -369,6 +371,7 @@ def build_buy_sell_report_from_layer1(
     bundle: dict[str, Any],
     *,
     include_llm_review: bool = False,
+    retrieved_chunks: list[dict[str, Any]] | None = None,
 ) -> BuySellReport:
     weights = ScoreWeights()
     f = score_fundamentals(bundle)
@@ -395,7 +398,7 @@ def build_buy_sell_report_from_layer1(
     if dcf_proxy is not None and price not in (None, 0):
         implied = ((dcf_proxy - price) / price) * 100.0
 
-    citations = [
+    citations: list[CitationItem] = [
         CitationItem(
             id="layer1-fundamentals",
             title="Layer1 fundamentals snapshot",
@@ -415,6 +418,20 @@ def build_buy_sell_report_from_layer1(
             snippet="Recent headlines/sentiment rows used for sentiment scoring.",
         ),
     ]
+    for row in (retrieved_chunks or [])[:6]:
+        cid = str(row.get("chunk_id") or "").strip()
+        if not cid:
+            continue
+        citations.append(
+            CitationItem(
+                id=cid,
+                title=str(row.get("title") or f"{row.get('doc_type', 'document')} chunk"),
+                source=str(row.get("source") or row.get("doc_type") or "rag"),
+                url=str(row.get("url") or "") or None,
+                date=str(row.get("published_at") or "") or None,
+                snippet=str(row.get("text") or "")[:220],
+            )
+        )
 
     llm_review = _build_llm_review(
         ticker=ticker.upper(),
@@ -423,6 +440,7 @@ def build_buy_sell_report_from_layer1(
         t=t,
         s=s,
         include_llm_review=include_llm_review,
+        retrieval_chunks=retrieved_chunks,
     )
 
     return BuySellReport(

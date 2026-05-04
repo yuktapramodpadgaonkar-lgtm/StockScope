@@ -48,6 +48,7 @@ def get_layer1_for_llm(
         "alpha_vantage": 0,
         "finnhub": 0,
         "fmp": 0,
+        "sec_edgar": 0,
         "local_compute": 0,
     }
 
@@ -139,6 +140,7 @@ def get_layer1_for_llm(
         }
 
     filings = get_filings_or_transcripts(sym)
+    ledger["sec_edgar"] += int(filings.get("http_calls") or 0)
 
     data_lineage: dict[str, str] = {
         "price_history": "yfinance Ticker.history (single fetch shared with technicals)",
@@ -154,7 +156,11 @@ def get_layer1_for_llm(
             if fh_calls
             else "yfinance info analyst fields (same info() call)"
         ),
-        "filings_transcripts": filings.get("note", "stub"),
+        "filings_transcripts": (
+            "sec_edgar recent 10-K/10-Q/8-K"
+            if (filings.get("source") == "sec_edgar" and filings.get("items"))
+            else filings.get("note", filings.get("error", "stub"))
+        ),
     }
 
     total_external = (
@@ -162,6 +168,7 @@ def get_layer1_for_llm(
         + ledger["alpha_vantage"]
         + ledger["finnhub"]
         + ledger["fmp"]
+        + ledger["sec_edgar"]
     )
 
     return {

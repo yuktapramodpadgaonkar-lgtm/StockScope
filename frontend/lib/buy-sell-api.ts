@@ -1,4 +1,4 @@
-/** Mirrors backend BuySellReport (schema v1). */
+/** Mirrors backend BuySellReport (schema v1.x; optional `agent_pipeline`, `memory`). */
 
 export type Recommendation = "BUY" | "HOLD" | "SELL";
 
@@ -16,6 +16,36 @@ export type ValuationAnalysis = {
   dcf_value: number | null;
   current_price: number | null;
   implied_upside: number | null;
+};
+
+export type CriticResult = {
+  passed: boolean;
+  incomplete_evidence: boolean;
+  flags: string[];
+  notes: string[];
+};
+
+export type MemoryBlock = {
+  session_id: string;
+  recent_tickers: string[];
+  preferred_horizon: string | null;
+  analysis_style: string | null;
+  session_summary: string;
+  follow_up_context: string;
+};
+
+export type AgentPipelineBlock = {
+  planner_version: string;
+  plan_summary: string;
+  planned_steps: { id: string; description: string }[];
+  execution_trace: {
+    step_id: string;
+    description: string;
+    status: string;
+    duration_ms: number;
+    detail: string | null;
+  }[];
+  critic: CriticResult;
 };
 
 export type BuySellReport = {
@@ -71,6 +101,10 @@ export type BuySellReport = {
     };
   };
   citations: CitationItem[];
+  /** Phase 6 — present on `/api/buy-sell/analyze` when `use_agent_pipeline=true` (default). */
+  agent_pipeline?: AgentPipelineBlock | null;
+  /** Phase 7 — present when `use_memory=true` (default) and memory is enabled on the server. */
+  memory?: MemoryBlock | null;
 };
 
 function getApiBase(): string {

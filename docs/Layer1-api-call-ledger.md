@@ -20,7 +20,7 @@ This document tracks **what** each field comes from and **how many logical provi
 | Fundamentals subset (P/E, margins, etc.) | yfinance `Ticker.info` | Finnhub financials *(not wired in MVP)* | Future: only if key fields null |
 | News + sentiment | Alpha Vantage `NEWS_SENTIMENT` | yfinance `Ticker.news` | +1 yfinance if AV absent/fails |
 | Analyst **trend series** (buy/hold/sell by period) | Finnhub `/stock/recommendation` | yfinance `info` analyst fields only | 0 (reuse same `info`) |
-| Filings / transcripts | Stub | SEC/RAG in Phase 5 | 0 |
+| Filings / transcripts | **SEC EDGAR** (10-K / 10-Q / 8-K text) when `SEC_USER_AGENT` is set | Stub if disabled | **1 + N** (`submissions` + each filing GET, counted in `call_ledger.sec_edgar`) |
 
 ---
 

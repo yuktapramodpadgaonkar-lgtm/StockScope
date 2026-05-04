@@ -48,6 +48,8 @@ def _build_prompt(
     f: DimensionRuleScore,
     t: DimensionRuleScore,
     s: DimensionRuleScore,
+    *,
+    retrieval_evidence: list[dict[str, Any]] | None = None,
 ) -> str:
     context = {
         "ticker": ticker,
@@ -57,6 +59,8 @@ def _build_prompt(
             "sentiment": s.model_dump(mode="json"),
             "overall": overall.model_dump(mode="json"),
         },
+        # Phase 5: grounding snippets retrieved for this ticker (news/filings when available).
+        "retrieval_evidence": retrieval_evidence or [],
         "task": (
             "You are an advisory reviewer. Do NOT replace rule scores. "
             "Return JSON only with keys: llm_score_suggestion, agreement_with_rules, rationale, warnings, citations_used."
@@ -64,7 +68,10 @@ def _build_prompt(
         "constraints": {
             "score_range": "0-100 integers",
             "recommendation": ["BUY", "HOLD", "SELL"],
-            "citations_used": "array of citation ids if any, otherwise []",
+            "citations_used": (
+                "array of chunk_id values taken ONLY from retrieval_evidence[].chunk_id "
+                "when referencing claims; otherwise []"
+            ),
             "warnings": "array of short strings",
         },
     }
@@ -122,8 +129,31 @@ def generate_hf_llm_review(
     fundamental: DimensionRuleScore,
     technical: DimensionRuleScore,
     sentiment: DimensionRuleScore,
+    retrieval_chunks: list[dict[str, Any]] | None = None,
 ) -> LlmReview:
-    prompt = _build_prompt(ticker, overall, fundamental, technical, sentiment)
+    ev: list[dict[str, Any]] = []
+    for row in (retrieval_chunks or [])[:10]:
+        if not isinstance(row, dict):
+            continue
+        ev.append(
+            {
+                "chunk_id": row.get("chunk_id"),
+                "doc_type": row.get("doc_type"),
+                "source": row.get("source"),
+                "published_at": row.get("published_at"),
+                "title": row.get("title"),
+                "text": str(row.get("text") or "")[:900],
+            }
+        )
+
+    prompt = _build_prompt(
+        ticker,
+        overall,
+        fundamental,
+        technical,
+        sentiment,
+        retrieval_evidence=ev,
+    )
     parsed = _hf_call(prompt)
 
     s = parsed.get("llm_score_suggestion") or {}
