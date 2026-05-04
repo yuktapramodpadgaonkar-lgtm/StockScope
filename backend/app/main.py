@@ -5,6 +5,7 @@ from app.api.analysis_fundamental import router as analysis_fundamental_router
 from app.api.auth import router as auth_router
 from app.api.analysis_news_sentiment import router as analysis_news_sentiment_router
 from app.api.buy_sell_analysis import router as buy_sell_router
+from app.api.buy_sell_memory import router as buy_sell_memory_router
 from app.api.chat import router as chat_router
 from app.api.history import router as history_router
 from app.api.market_movers import router as market_movers_router
@@ -30,6 +31,7 @@ app.include_router(chat_router)
 app.include_router(analysis_news_sentiment_router)
 app.include_router(history_router)
 app.include_router(buy_sell_router)
+app.include_router(buy_sell_memory_router)
 
 
 @app.get("/health")

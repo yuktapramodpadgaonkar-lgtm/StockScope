@@ -1,0 +1,98 @@
+[
+  {
+    "id": 1,
+    "ticker": "AAPL",
+    "query": "6-month view on large-cap quality",
+    "horizon": "6 months",
+    "include_retrieval": false,
+    "include_llm_review": false
+  },
+  {
+    "id": 2,
+    "ticker": "MSFT",
+    "query": "Cloud growth vs regulation risk",
+    "horizon": "6-12 months",
+    "include_retrieval": false,
+    "include_llm_review": false
+  },
+  {
+    "id": 3,
+    "ticker": "JNJ",
+    "query": "Defensive dividend staples",
+    "horizon": "12 months",
+    "include_retrieval": false,
+    "include_llm_review": false
+  },
+  {
+    "id": 4,
+    "ticker": "XOM",
+    "query": "Energy cycle exposure",
+    "horizon": "6 months",
+    "include_retrieval": false,
+    "include_llm_review": false
+  },
+  {
+    "id": 5,
+    "ticker": "JPM",
+    "query": "Rate sensitivity for banks",
+    "horizon": "6-12 months",
+    "include_retrieval": false,
+    "include_llm_review": false
+  },
+  {
+    "id": 6,
+    "ticker": "NVDA",
+    "query": "High-beta growth semis",
+    "horizon": "3-6 months",
+    "include_retrieval": false,
+    "include_llm_review": false
+  },
+  {
+    "id": 7,
+    "ticker": "KO",
+    "query": "Consumer staples stability",
+    "horizon": "12 months",
+    "include_retrieval": false,
+    "include_llm_review": false
+  },
+  {
+    "id": 8,
+    "ticker": "DIS",
+    "query": "Media / parks cyclicality",
+    "horizon": "6 months",
+    "include_retrieval": false,
+    "include_llm_review": false
+  },
+  {
+    "id": 9,
+    "ticker": "V",
+    "query": "Payments network moat",
+    "horizon": "6-12 months",
+    "include_retrieval": false,
+    "include_llm_review": false
+  },
+  {
+    "id": 10,
+    "ticker": "WMT",
+    "query": "Retail margin pressure",
+    "horizon": "6 months",
+    "include_retrieval": false,
+    "include_llm_review": false
+  },
+  {
+    "id": 11,
+    "ticker": "PFE",
+    "query": "Pharma pipeline / patent cliff",
+    "horizon": "12 months",
+    "include_retrieval": false,
+    "include_llm_review": false
+  },
+  {
+    "id": 12,
+    "ticker": "BA",
+    "query": "Aerospace cyclical recovery",
+    "horizon": "6-12 months",
+    "include_retrieval": false,
+    "include_llm_review": false
+  }
+]

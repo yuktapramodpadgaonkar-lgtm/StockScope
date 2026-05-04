@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://stockscope.local/schemas/buy_sell_report.json",
   "title": "BuySellReport",
-  "description": "Kavout-style buy/sell analysis output contract — v1.0.0",
+  "description": "Kavout-style buy/sell analysis output contract — v1.2.0 (optional agent_pipeline + memory)",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -24,7 +24,10 @@
     "disclaimer"
   ],
   "properties": {
-    "schema_version": { "type": "string", "const": "1.0.0" },
+    "schema_version": {
+      "type": "string",
+      "enum": ["1.0.0", "1.1.0", "1.2.0"]
+    },
     "ticker": { "type": "string", "minLength": 1 },
     "recommendation": { "type": "string", "enum": ["BUY", "HOLD", "SELL"] },
     "confidence": { "type": "integer", "minimum": 0, "maximum": 100 },
@@ -81,6 +84,15 @@
     "citations": {
       "type": "array",
       "items": { "$ref": "#/$defs/citation" }
+    },
+    "agent_pipeline": {
+      "anyOf": [
+        { "$ref": "#/$defs/buy_sell_agent_pipeline" },
+        { "type": "null" }
+      ]
+    },
+    "memory": {
+      "anyOf": [{ "$ref": "#/$defs/buy_sell_memory" }, { "type": "null" }]
     }
   },
   "$defs": {
@@ -270,6 +282,82 @@
         "rationale": { "type": "string" },
         "warnings": { "type": "array", "items": { "type": "string" } },
         "citations_used": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "planned_step_out": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "description"],
+      "properties": {
+        "id": { "type": "string" },
+        "description": { "type": "string" }
+      }
+    },
+    "pipeline_step_trace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["step_id", "description", "status", "duration_ms"],
+      "properties": {
+        "step_id": { "type": "string" },
+        "description": { "type": "string" },
+        "status": { "type": "string", "enum": ["ok", "skipped", "error"] },
+        "duration_ms": { "type": "number" },
+        "detail": { "type": ["string", "null"] }
+      }
+    },
+    "critic_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["passed", "incomplete_evidence", "flags", "notes"],
+      "properties": {
+        "passed": { "type": "boolean" },
+        "incomplete_evidence": { "type": "boolean" },
+        "flags": { "type": "array", "items": { "type": "string" } },
+        "notes": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "buy_sell_memory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "session_id",
+        "recent_tickers",
+        "preferred_horizon",
+        "analysis_style",
+        "session_summary",
+        "follow_up_context"
+      ],
+      "properties": {
+        "session_id": { "type": "string" },
+        "recent_tickers": { "type": "array", "items": { "type": "string" } },
+        "preferred_horizon": { "type": ["string", "null"] },
+        "analysis_style": { "type": ["string", "null"] },
+        "session_summary": { "type": "string" },
+        "follow_up_context": { "type": "string" }
+      }
+    },
+    "buy_sell_agent_pipeline": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "planner_version",
+        "plan_summary",
+        "planned_steps",
+        "execution_trace",
+        "critic"
+      ],
+      "properties": {
+        "planner_version": { "type": "string" },
+        "plan_summary": { "type": "string" },
+        "planned_steps": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/planned_step_out" }
+        },
+        "execution_trace": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/pipeline_step_trace" }
+        },
+        "critic": { "$ref": "#/$defs/critic_result" }
       }
     }
   }

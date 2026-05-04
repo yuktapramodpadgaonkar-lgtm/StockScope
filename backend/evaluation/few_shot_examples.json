@@ -1,0 +1,32 @@
+[
+  {
+    "id": "ex-1",
+    "ticker": "AAPL",
+    "summary": "Constructive bias when fundamentals and technicals align; cite Layer1 + filings for valuation claims.",
+    "report_excerpt": {
+      "recommendation": "BUY",
+      "confidence": 72,
+      "final_verdict": {
+        "overall_score": 70,
+        "rating": "BUY",
+        "why_dimensions_align": "Growth and cash generation support the rating.",
+        "conflicts": "Rich multiple caps upside."
+      }
+    }
+  },
+  {
+    "id": "ex-2",
+    "ticker": "XOM",
+    "summary": "Commodity cyclical — highlight dispersion between sentiment and fundamentals.",
+    "report_excerpt": {
+      "recommendation": "HOLD",
+      "confidence": 55,
+      "final_verdict": {
+        "overall_score": 58,
+        "rating": "HOLD",
+        "why_dimensions_align": "Mixed signals across dimensions.",
+        "conflicts": "Macro-driven volatility."
+      }
+    }
+  }
+]

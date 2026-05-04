@@ -33,6 +33,34 @@ class Settings(BaseSettings):
     movers_cache_ttl_intraday_seconds: int = 60
     movers_cache_ttl_previous_day_seconds: int = 300
 
+    # Phase 5.1 — RAG retrieval (embeddings + store hygiene)
+    # Hugging Face sentence embeddings (same token as LLM). If unset, retrieval falls back to BM25-only.
+    rag_embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
+    rag_embedding_batch_size: int = 16
+    rag_bm25_weight: float = 0.45
+    rag_embedding_weight: float = 0.55
+    # Default max age for retrieved chunks (days). None disables age filter in settings; API can still pass a value.
+    # Use -1 to disable published_at freshness filtering (when not overridden by the API).
+    rag_max_chunk_age_days: int = 730
+    rag_max_total_chunks: int = 80_000
+    rag_max_chunks_per_ticker: int = 600
+    # When chunks.jsonl exceeds this size, rotate to an archive file and start fresh (+ clear per-ticker embedding npz).
+    rag_rotate_bytes: int = 100 * 1024 * 1024
+    # SEC EDGAR (data.sec.gov / www.sec.gov) — SEC requires a descriptive User-Agent with contact info.
+    sec_edgar_enabled: bool = True
+    sec_user_agent: str = ""
+    sec_filings_limit: int = 2
+    sec_filing_max_download_chars: int = 200_000
+    sec_cik_cache_hours: int = 168
+    sec_request_delay_seconds: float = 0.15
+
+    # Phase 7 — session memory (file-backed under StockScope/data/memory/)
+    memory_enabled: bool = True
+    memory_max_recent_tickers: int = 30
+
+    # Phase 8 — evaluation harness (see backend/evaluation/)
+    eval_output_dir: str = ""  # optional override; default writes under data/eval/
+
     model_config = SettingsConfigDict(
         env_file=str(_BACKEND_DIR / ".env"),
         env_file_encoding="utf-8",

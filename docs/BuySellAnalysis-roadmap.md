@@ -1,5 +1,7 @@
 # Buy/Sell Analysis — Next Steps & Roadmap
 
+**See also:** Per-phase implementation status (done vs. not done): [`docs/phases/buy-sell-implementation-status.md`](phases/buy-sell-implementation-status.md).
+
 Citation-grounded **AI Equity Research Assistant** for buy/sell analysis. The **Kavout-style report** is the **output contract**; the **agentic + RAG + tools** stack sits behind it.
 
 ---
@@ -148,16 +150,22 @@ Then **`overall_recommendation()`** maps weighted score to BUY/HOLD/SELL using t
 13. Implement **hybrid retriever** + metadata filters.
 14. Merge retrieved chunks into section prompts with explicit **source IDs**.
 
+**Status (implemented, v1 + 5.1):** `backend/app/rag/` — chunk store with **prune + size-based rotation**, **BM25 + HF embedding** hybrid retrieval (per-ticker `data/rag/index/by_ticker/*.npz`), **freshness** (`retrieval_max_age_days` / `RAG_MAX_CHUNK_AGE_DAYS`), **SEC EDGAR** filings in Layer 1 when `SEC_USER_AGENT` is set, and analyze-endpoint wiring (`include_retrieval`, `retrieval_top_k`, embedding sync). See `docs/Phase5-RAG-checklist.md`.
+
 ### Phase 6 — Planner / Executor / Critic
 
 15. Implement **planner** (task graph from user query).
 16. Implement **executor** (tool + retrieval calls, logging).
 17. Implement **critic** (gates or flags before returning report).
 
+**Status (implemented, v1):** `backend/app/agents/` — fixed DAG planner (`planner.py`), timed executor trace (`executor.py`), rule-based critic (`critic.py`), orchestrator `run_buy_sell_with_agents()` attaching **`agent_pipeline`** to `BuySellReport` on `GET /api/buy-sell/analyze/{ticker}` (`use_agent_pipeline` default true). Report schema **`1.2.0`** when memory is attached. See [`docs/phases/buy-sell-implementation-status.md`](phases/buy-sell-implementation-status.md).
+
 ### Phase 7 — Memory
 
 18. Store **recent tickers**, **preferred horizon**, **analysis style**, **session summary**.
 19. Expose **retrieve** for follow-up turns (“same as last time but shorter”).
+
+**Status (implemented, v1):** `backend/app/memory/` + `GET/PUT /api/buy-sell/memory/{session_id}`; analyze params **`session_id`**, **`use_memory`**; optional **`memory`** block on `BuySellReport`; `data/memory/sessions.json`.
 
 ### Phase 8 — Evaluation
 
@@ -165,6 +173,8 @@ Then **`overall_recommendation()`** maps weighted score to BUY/HOLD/SELL using t
 21. Add **`few_shot_examples.json`** (10–20 report exemplars).
 22. **`run_eval.py`** + **metrics**: citation correctness, groundedness, format, reasoning, latency, cost.
 23. **Multi-model comparison:** e.g. OpenAI + Gemini or Claude + **one open-source** (Llama / Qwen / Mistral) on the same eval set.
+
+**Status (implemented, v1 starter):** `backend/evaluation/eval_set.json` (12 cases to extend), `few_shot_examples.json`, `run_eval.py --inline`, `backend/app/evaluation/metrics.py`. **Item 23** (multi-model) not automated yet. See `backend/evaluation/README.md`.
 
 ---
 

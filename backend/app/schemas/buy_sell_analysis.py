@@ -1,7 +1,7 @@
 """
 Buy/Sell analysis report — Kavout-style output contract (schema v1).
 
-See `schemas/buy_sell_report.json` at the repo root for the frozen JSON Schema.
+See `schemas/buy_sell_report.json` at the repo root for the frozen JSON Schema (v1.2.0).
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ from enum import Enum
 from pydantic import BaseModel, Field
 
 
-SCHEMA_VERSION = "1.0.0"
+SCHEMA_VERSION = "1.2.0"
 
 
 class Recommendation(str, Enum):
@@ -154,6 +154,53 @@ class LlmReview(BaseModel):
     citations_used: list[str] = Field(default_factory=list)
 
 
+class PlannedStepOut(BaseModel):
+    """Planner DAG node (human-readable; mirrors agents.planner.PlannedStep)."""
+
+    id: str
+    description: str = ""
+
+
+class PipelineStepTrace(BaseModel):
+    """Executor timing record for one executed or skipped step."""
+
+    step_id: str
+    description: str = ""
+    status: str = "ok"  # ok | skipped | error
+    duration_ms: float = 0.0
+    detail: str | None = None
+
+
+class CriticResult(BaseModel):
+    """Phase 6 critic — advisory flags; does not replace deterministic recommendation."""
+
+    passed: bool = True
+    incomplete_evidence: bool = False
+    flags: list[str] = Field(default_factory=list)
+    notes: list[str] = Field(default_factory=list)
+
+
+class AgentPipelineBlock(BaseModel):
+    """Phase 6 — planner output + executor trace + critic assessment."""
+
+    planner_version: str = "phase6-v1"
+    plan_summary: str = ""
+    planned_steps: list[PlannedStepOut] = Field(default_factory=list)
+    execution_trace: list[PipelineStepTrace] = Field(default_factory=list)
+    critic: CriticResult = Field(default_factory=CriticResult)
+
+
+class MemoryBlock(BaseModel):
+    """Phase 7 — session memory echoed on analyze responses for follow-up UX / future chat."""
+
+    session_id: str = "default"
+    recent_tickers: list[str] = Field(default_factory=list)
+    preferred_horizon: str | None = None
+    analysis_style: str | None = "balanced"
+    session_summary: str = ""
+    follow_up_context: str = ""
+
+
 class BuySellReport(BaseModel):
     schema_version: str = SCHEMA_VERSION
     ticker: str
@@ -176,11 +223,14 @@ class BuySellReport(BaseModel):
             "and does not constitute financial, investment, or legal advice."
         )
     )
+    agent_pipeline: AgentPipelineBlock | None = None
+    memory: MemoryBlock | None = None
 
 
 def mock_buy_sell_report() -> BuySellReport:
     """Placeholder report for Phase 1 UI — replace with pipeline output later."""
     return BuySellReport(
+        schema_version=SCHEMA_VERSION,
         ticker="AAPL",
         recommendation=Recommendation.BUY,
         confidence=78,
