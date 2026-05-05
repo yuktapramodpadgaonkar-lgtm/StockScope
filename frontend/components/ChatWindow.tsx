@@ -64,6 +64,9 @@ export function ChatWindow({ initialThreadId = "thread_001" }: ChatWindowProps) 
               <p className="text-xs uppercase tracking-wide text-slate-500">
                 Intent: <span className="text-emerald-400/90">{msg.payload.detected_intent}</span>
               </p>
+              {msg.payload.tickers.length > 0 ? (
+                <p className="text-xs text-slate-500">Tickers: {msg.payload.tickers.join(", ")}</p>
+              ) : null}
               <p className="text-slate-100">{msg.payload.answer}</p>
               <ul className="list-inside list-disc text-xs text-slate-400">
                 {msg.payload.summary_bullets.map((b) => (

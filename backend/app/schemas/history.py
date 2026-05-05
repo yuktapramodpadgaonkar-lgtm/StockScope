@@ -1,4 +1,4 @@
-"""Pydantic models for the Week 1 history API."""
+"""Pydantic models for history APIs."""
 
 from pydantic import BaseModel, Field
 
@@ -26,3 +26,23 @@ class HistoryResponse(BaseModel):
     chat_history: list[ChatHistoryItem]
     research_history: list[ResearchHistoryItem]
     saved_prompts: list[SavedPromptItem]
+
+
+class ThreadMessage(BaseModel):
+    role: str
+    text: str
+    timestamp: str
+
+
+class ThreadHistoryResponse(BaseModel):
+    thread_id: str
+    messages: list[ThreadMessage]
+
+
+class SavePromptRequest(BaseModel):
+    title: str = Field(..., min_length=1, max_length=120)
+    prompt_text: str = Field(..., min_length=1, max_length=2000)
+
+
+class SavePromptResponse(BaseModel):
+    saved_prompt: SavedPromptItem

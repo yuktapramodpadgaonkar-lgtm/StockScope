@@ -16,6 +16,12 @@ def post_news_sentiment(body: NewsSentimentRequest) -> NewsSentimentResponse:
     TODO: Live news fetch + model-based sentiment scoring.
     """
     try:
-        return build_news_sentiment_report(body.ticker, body.date_from, body.date_to)
+        return build_news_sentiment_report(
+            body.ticker,
+            body.date_from,
+            body.date_to,
+            max_articles=body.max_articles,
+            model_name=body.model_name,
+        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e

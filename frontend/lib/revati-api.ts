@@ -1,4 +1,9 @@
-import type { ChatQueryResponse, HistoryResponse, NewsSentimentResponse } from "@/lib/revati-types";
+import type {
+  ChatQueryRequest,
+  ChatQueryResponse,
+  HistoryResponse,
+  NewsSentimentResponse,
+} from "@/lib/revati-types";
 
 function getApiBase(): string {
   const base = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000";
@@ -6,10 +11,11 @@ function getApiBase(): string {
 }
 
 export async function postChatQuery(query: string, threadId?: string | null): Promise<ChatQueryResponse> {
+  const body: ChatQueryRequest = { query, thread_id: threadId ?? null };
   const res = await fetch(`${getApiBase()}/api/chat/query`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ query, thread_id: threadId ?? null }),
+    body: JSON.stringify(body),
     cache: "no-store",
   });
   if (!res.ok) {
@@ -23,6 +29,7 @@ export type NewsSentimentRequestBody = {
   ticker: string;
   date_from?: string | null;
   date_to?: string | null;
+  max_articles?: number;
 };
 
 export async function postNewsSentiment(body: NewsSentimentRequestBody): Promise<NewsSentimentResponse> {
@@ -33,6 +40,7 @@ export async function postNewsSentiment(body: NewsSentimentRequestBody): Promise
       ticker: body.ticker.trim(),
       date_from: body.date_from ?? null,
       date_to: body.date_to ?? null,
+      max_articles: body.max_articles ?? 10,
     }),
     cache: "no-store",
   });

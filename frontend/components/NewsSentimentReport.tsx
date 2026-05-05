@@ -42,6 +42,11 @@ export function NewsSentimentReport({ data }: NewsSentimentReportProps) {
           <p className="text-sm font-semibold capitalize text-emerald-300">{agg.overall_label}</p>
         </div>
       </header>
+      {data.fallback_used ? (
+        <p className="rounded border border-amber-600/40 bg-amber-900/20 px-3 py-2 text-xs text-amber-300">
+          Fallback mode used: live Finnhub feed unavailable, so sample articles were used.
+        </p>
+      ) : null}
 
       <div className="grid gap-3 sm:grid-cols-3">
         <SentimentBar label="Positive" value={agg.positive} color="bg-emerald-500" />
@@ -103,7 +108,21 @@ export function NewsSentimentReport({ data }: NewsSentimentReportProps) {
 
       <div className="rounded-lg border border-slate-800 bg-slate-950/60 p-3">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Summary</h3>
-        <p className="mt-2 text-sm leading-relaxed text-slate-300">{data.llm_summary}</p>
+        <p className="mt-2 text-sm leading-relaxed text-slate-300">{data.summary}</p>
+      </div>
+
+      <div className="rounded-lg border border-slate-800 bg-slate-950/60 p-3">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Citations</h3>
+        <ul className="mt-2 space-y-1">
+          {data.citations.map((c) => (
+            <li key={`${c.url}-${c.published_at}`} className="text-xs text-slate-400">
+              <a href={c.url} target="_blank" rel="noreferrer" className="text-emerald-400 hover:underline">
+                {c.title}
+              </a>{" "}
+              — {c.source} ({c.published_at})
+            </li>
+          ))}
+        </ul>
       </div>
 
       <p className="text-xs text-slate-500">{data.disclaimer}</p>
