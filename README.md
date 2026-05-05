@@ -87,17 +87,40 @@ The folder `.venv/` is listed in `.gitignore` and should **not** be committed.
    - Windows: `copy backend\.env.example backend\.env`
    - macOS/Linux: `cp backend/.env.example backend/.env`
 
-3. Start API (from **repo root**, with `.venv` activated):
+3. **Optional — AI explanations on Fundamental analysis:** set `GEMINI_API_KEY` in
+   `backend/.env` if you use the **Gemini** model in the UI. For **Mistral** and
+   **Llama 3.1**, run [Ollama](https://ollama.com/) locally and pull models (from
+   any terminal):
+
+   ```bash
+   ollama pull mistral:7b
+   ollama pull llama3.1:8b
+   ```
+
+   Override the Ollama URL only if needed: `OLLAMA_BASE_URL` in `backend/.env`
+   (default `http://localhost:11434`).
+
+4. Start API (from **repo root**, with `.venv` activated):
 
    ```powershell
    uvicorn app.main:app --reload --app-dir backend
    ```
 
-4. Open `http://127.0.0.1:8000/docs` for interactive API docs.
+5. Open `http://127.0.0.1:8000/docs` for interactive API docs.
 
-5. For browser access from the frontend, ensure `backend/.env` includes
+6. For browser access from the frontend, ensure `backend/.env` includes
    `CORS_ORIGINS` with `http://localhost:3000` and `http://127.0.0.1:3000`
    (see `backend/.env.example`).
+
+## Fundamental analysis + mock auth + multi-model AI
+
+- **UI:** sign in on `http://localhost:3000`, then open **`/fundamentals`**.
+- **Deterministic metrics** (yfinance + rule-based strengths/risks) always load first;
+  the selected **AI model** only explains that snapshot.
+- **Model dropdown:** **Gemini** (API key), **Mistral** and **Llama 3.1** (Ollama).
+  Each **Analyze** request calls the API with `include_llm=true` and the matching
+  `provider` / `model` query parameters.
+- If the LLM is unavailable, the UI still shows metrics and an **`ai_error`** message.
 
 ## Frontend (Market Movers UI)
 
@@ -117,7 +140,8 @@ separate from the backend virtual environment.)
    ```
 
 2. Open `http://localhost:3000` — use **Open Market Movers** or go to
-   `http://localhost:3000/market-movers`.
+   `http://localhost:3000/market-movers`. **Fundamental analysis** (with optional
+   AI explanation) lives at `http://localhost:3000/fundamentals`.
 
 3. Keep the FastAPI server running on `http://127.0.0.1:8000`. The UI reads
    `NEXT_PUBLIC_API_BASE_URL` from `frontend/.env.local` (default in the example

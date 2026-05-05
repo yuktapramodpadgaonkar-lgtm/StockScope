@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     movers_cache_ttl_intraday_seconds: int = 60
     movers_cache_ttl_previous_day_seconds: int = 300
 
+    # Optional AI explanations (fundamental analysis). Loaded from backend/.env.
+    gemini_api_key: str = ""
+    ollama_base_url: str = "http://localhost:11434"
+
     model_config = SettingsConfigDict(
         env_file=str(_BACKEND_DIR / ".env"),
         env_file_encoding="utf-8",

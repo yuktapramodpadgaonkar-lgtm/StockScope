@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   fetchFundamentalAnalysis,
   type FundamentalAnalysisResponse,
@@ -71,20 +71,33 @@ type FundamentalReportProps = {
 
 export function FundamentalReport({ defaultTicker = "AAPL" }: FundamentalReportProps) {
   const [input, setInput] = useState(defaultTicker);
+  const [llmChoice, setLlmChoice] = useState<"mistral" | "llama" | "gemini">("mistral");
+  const llmChoiceRef = useRef(llmChoice);
+  llmChoiceRef.current = llmChoice;
+
   const [report, setReport] = useState<FundamentalAnalysisResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async (symbol: string) => {
+  const load = useCallback(async (symbol: string, choice?: "mistral" | "llama" | "gemini") => {
     const sym = symbol.trim();
     if (!sym) {
       setError("Enter a ticker symbol.");
       return;
     }
+    const selected = choice ?? llmChoiceRef.current;
+    const provider =
+      selected === "gemini" ? "gemini" : "ollama";
+    const model =
+      selected === "gemini"
+        ? "gemini-1.5-flash"
+        : selected === "llama"
+          ? "llama3.1:8b"
+          : "mistral:7b";
     setLoading(true);
     setError(null);
     try {
-      const data = await fetchFundamentalAnalysis(sym);
+      const data = await fetchFundamentalAnalysis(sym, true, provider, model);
       setReport(data);
     } catch (e) {
       setReport(null);
@@ -95,7 +108,7 @@ export function FundamentalReport({ defaultTicker = "AAPL" }: FundamentalReportP
   }, []);
 
   useEffect(() => {
-    void load(defaultTicker);
+    void load(defaultTicker, llmChoiceRef.current);
   }, [defaultTicker, load]);
 
   return (
@@ -126,6 +139,24 @@ export function FundamentalReport({ defaultTicker = "AAPL" }: FundamentalReportP
           {loading ? "Loading…" : "Analyze"}
         </button>
       </div>
+
+      <label className="flex flex-col gap-1.5 sm:max-w-xs">
+        <span className="text-xs font-medium uppercase tracking-wide text-slate-500">
+          AI model
+        </span>
+        <select
+          value={llmChoice}
+          onChange={(e) => setLlmChoice(e.target.value as "mistral" | "llama" | "gemini")}
+          className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:ring-2 focus:ring-emerald-500/40"
+        >
+          <option value="gemini">Gemini</option>
+          <option value="mistral">Mistral</option>
+          <option value="llama">Llama 3.1</option>
+        </select>
+        <p className="text-xs text-slate-500">
+          Always requests an AI explanation; deterministic metrics remain the source of truth.
+        </p>
+      </label>
 
       {error && (
         <div
@@ -207,6 +238,34 @@ export function FundamentalReport({ defaultTicker = "AAPL" }: FundamentalReportP
               </ul>
             </section>
           </div>
+
+          {(report.ai_summary || report.ai_error) && (
+            <section className="rounded-xl border border-violet-500/25 bg-violet-950/20 p-5 shadow-xl">
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-violet-300/90">
+                AI explanation
+              </h3>
+              <p className="mt-2 text-xs text-slate-500">
+                Plain-language notes from a local model, based only on the metrics above—not
+                advice.
+              </p>
+              {report.ai_error && (
+                <p
+                  className="mt-3 rounded-lg border border-amber-500/35 bg-amber-950/30 px-3 py-2 text-sm text-amber-100"
+                  role="status"
+                >
+                  {report.ai_error}
+                </p>
+              )}
+              {report.ai_summary && (
+                <div className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-slate-200">
+                  {report.ai_summary}
+                </div>
+              )}
+              {report.ai_summary && report.ai_model && (
+                <p className="mt-3 text-xs text-slate-500">Model: {report.ai_model}</p>
+              )}
+            </section>
+          )}
 
           <section className="rounded-xl border border-slate-800 bg-slate-900/50 p-5">
             <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
