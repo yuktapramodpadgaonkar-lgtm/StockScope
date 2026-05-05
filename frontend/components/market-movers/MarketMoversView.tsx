@@ -4,10 +4,14 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   fetchMarketMovers,
   type MarketMoverItem,
-  type MoverType,
   type TimeMode,
   type Universe,
 } from "@/lib/market-movers-api";
+import { Badge } from "@/components/ui/Badge";
+import { Card } from "@/components/ui/Card";
+import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
+import { MetricCard } from "@/components/ui/MetricCard";
+import { SectionHeader } from "@/components/ui/SectionHeader";
 
 const UNIVERSES: { value: Universe; label: string }[] = [
   { value: "all", label: "All (sample)" },
@@ -22,23 +26,21 @@ const MODES: { value: TimeMode; label: string }[] = [
   { value: "previous_day", label: "Previous day" },
 ];
 
-const MOVER_TABS: { value: MoverType; label: string }[] = [
-  { value: "gainers", label: "Top gainers" },
-  { value: "losers", label: "Top losers" },
-  { value: "52w_high", label: "52-week high" },
-  { value: "52w_low", label: "52-week low" },
+type UiMoverTab = "gainers" | "losers" | "most_active";
+
+const MOVER_TABS: { value: UiMoverTab; label: string }[] = [
+  { value: "gainers", label: "Gainers" },
+  { value: "losers", label: "Losers" },
+  { value: "most_active", label: "Most active" },
 ];
 
 const LIMITS = [10, 25, 50, 100] as const;
 
 type SortKey =
   | "symbol"
-  | "company_name"
   | "price"
   | "change_percent"
-  | "volume"
-  | "market_cap"
-  | "sector";
+  | "volume";
 
 function formatPrice(n: number | null | undefined): string {
   if (n == null || Number.isNaN(n)) return "—";
@@ -56,14 +58,6 @@ function formatPct(n: number | null | undefined): string {
 
 function formatInt(n: number | null | undefined): string {
   if (n == null || Number.isNaN(n)) return "—";
-  return n.toLocaleString();
-}
-
-function formatCap(n: number | null | undefined): string {
-  if (n == null || Number.isNaN(n)) return "—";
-  if (n >= 1e12) return `${(n / 1e12).toFixed(2)}T`;
-  if (n >= 1e9) return `${(n / 1e9).toFixed(2)}B`;
-  if (n >= 1e6) return `${(n / 1e6).toFixed(2)}M`;
   return n.toLocaleString();
 }
 
@@ -92,7 +86,7 @@ function sortItems(
 export function MarketMoversView() {
   const [universe, setUniverse] = useState<Universe>("sp500");
   const [mode, setMode] = useState<TimeMode>("intraday");
-  const [moverType, setMoverType] = useState<MoverType>("gainers");
+  const [moverType, setMoverType] = useState<UiMoverTab>("gainers");
   const [limit, setLimit] = useState<number>(25);
 
   const [items, setItems] = useState<MarketMoverItem[]>([]);
@@ -113,7 +107,7 @@ export function MarketMoversView() {
       const data = await fetchMarketMovers({
         universe,
         mode,
-        type: moverType,
+        type: moverType === "most_active" ? "gainers" : moverType,
         limit,
       });
       setItems(data.items);
@@ -143,9 +137,28 @@ export function MarketMoversView() {
   }, [selected]);
 
   const displayRows = useMemo(() => {
-    if (!userSort) return items;
-    return sortItems(items, userSort.key, userSort.dir);
-  }, [items, userSort]);
+    const baseRows =
+      moverType === "most_active"
+        ? [...items].sort((a, b) => (b.volume ?? 0) - (a.volume ?? 0))
+        : items;
+    if (!userSort) return baseRows;
+    return sortItems(baseRows, userSort.key, userSort.dir);
+  }, [items, moverType, userSort]);
+
+  const stats = useMemo(() => {
+    const positive = displayRows.filter((x) => (x.change_percent ?? 0) > 0).length;
+    const negative = displayRows.filter((x) => (x.change_percent ?? 0) < 0).length;
+    const avgMove =
+      displayRows.length > 0
+        ? displayRows.reduce((acc, x) => acc + (x.change_percent ?? 0), 0) / displayRows.length
+        : 0;
+    return {
+      positive,
+      negative,
+      avgMove,
+      totalVolume: displayRows.reduce((acc, x) => acc + (x.volume ?? 0), 0),
+    };
+  }, [displayRows]);
 
   function toggleSort(key: SortKey) {
     setUserSort((prev) => {
@@ -154,255 +167,238 @@ export function MarketMoversView() {
       }
       return {
         key,
-        dir:
-          key === "symbol" || key === "company_name" || key === "sector" ? "asc" : "desc",
+        dir: key === "symbol" ? "asc" : "desc",
       };
     });
   }
 
-  function sortIndicator(key: SortKey) {
-    if (userSort?.key !== key) return "";
-    return userSort.dir === "asc" ? " ↑" : " ↓";
+  function sortAriaSort(key: SortKey): "ascending" | "descending" | "none" {
+    if (userSort?.key !== key) return "none";
+    return userSort.dir === "asc" ? "ascending" : "descending";
+  }
+
+  function SortHeader({
+    label,
+    sortKey,
+    align = "left",
+  }: {
+    label: string;
+    sortKey: SortKey;
+    align?: "left" | "right";
+  }) {
+    const active = userSort?.key === sortKey;
+    return (
+      <th
+        scope="col"
+        className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50/95 px-5 py-3.5 backdrop-blur-sm"
+        aria-sort={sortAriaSort(sortKey)}
+      >
+        <div className={align === "right" ? "flex justify-end" : "flex justify-start"}>
+          <button
+            type="button"
+            onClick={() => toggleSort(sortKey)}
+            className={`group inline-flex items-center gap-1.5 rounded-lg px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 transition focus-visible:outline focus-visible:ring-2 focus-visible:ring-slate-400/60 ${
+              active
+                ? "text-slate-900"
+                : "hover:bg-slate-100/80 hover:text-slate-800"
+            }`}
+          >
+            <span>{label}</span>
+            <span
+              className={`flex flex-col leading-[0.55] text-[9px] tabular-nums ${
+                active ? "text-slate-700" : "text-slate-400 group-hover:text-slate-600"
+              }`}
+              aria-hidden
+            >
+              <span className={active && userSort?.dir === "asc" ? "text-slate-900" : ""}>▲</span>
+              <span className={active && userSort?.dir === "desc" ? "text-slate-900" : ""}>▼</span>
+            </span>
+          </button>
+        </div>
+      </th>
+    );
+  }
+
+  function changeCellClasses(pct: number | null | undefined): string {
+    if (pct == null || Number.isNaN(pct)) {
+      return "bg-slate-100/80 text-slate-500 ring-1 ring-slate-200/80";
+    }
+    if (pct > 0) {
+      return "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/70";
+    }
+    if (pct < 0) {
+      return "bg-rose-50 text-rose-700 ring-1 ring-rose-200/70";
+    }
+    return "bg-slate-100/80 text-slate-600 ring-1 ring-slate-200/80";
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-950 to-slate-900">
-      <header className="border-b border-slate-800/80 bg-slate-950/80 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-6 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-white">Market movers</h1>
-            <p className="mt-1 text-sm text-slate-400">
-              Rankings from your FastAPI backend (cached server-side later). Data is for
-              research only—not financial advice. Table order follows the server for each
-              category until you sort by a column.
-            </p>
+    <div className="min-h-screen bg-slate-50">
+      <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+        <Card>
+          <SectionHeader
+            title="Market Movers"
+            description="Track gainers, losers and most active symbols from the FastAPI market-movers API."
+            actions={
+              <button
+                type="button"
+                onClick={() => void load()}
+                disabled={loading}
+                className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:opacity-60"
+              >
+                {loading ? "Refreshing..." : "Refresh"}
+              </button>
+            }
+          />
+          <div className="mt-6 flex flex-wrap gap-2">
+            {MOVER_TABS.map((tab) => (
+              <button
+                key={tab.value}
+                type="button"
+                onClick={() => setMoverType(tab.value)}
+                className={`rounded-xl border px-3 py-2 text-sm font-medium transition ${
+                  moverType === tab.value
+                    ? "border-slate-900 bg-slate-900 text-white shadow-sm"
+                    : "border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
-          <button
-            type="button"
-            onClick={() => void load()}
-            disabled={loading}
-            className="self-start rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-slate-950 shadow-md shadow-emerald-500/15 transition hover:bg-emerald-400 disabled:opacity-60"
-          >
-            {loading ? "Refreshing…" : "Refresh"}
-          </button>
-        </div>
-      </header>
-
-      <div className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
-        <div className="flex flex-col gap-4 rounded-xl border border-slate-800 bg-slate-900/40 p-4 shadow-xl backdrop-blur sm:flex-row sm:flex-wrap sm:items-end">
-          <div className="flex flex-1 flex-col gap-2">
-            <span className="text-xs font-medium uppercase tracking-wide text-slate-500">
-              Category
-            </span>
-            <div className="flex flex-wrap gap-2">
-              {MOVER_TABS.map((tab) => (
-                <button
-                  key={tab.value}
-                  type="button"
-                  onClick={() => setMoverType(tab.value)}
-                  className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
-                    moverType === tab.value
-                      ? "bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-500/40"
-                      : "bg-slate-800/80 text-slate-300 hover:bg-slate-800"
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <label className="flex flex-col gap-1.5">
+              <span className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                Universe
+              </span>
+              <select
+                value={universe}
+                onChange={(e) => setUniverse(e.target.value as Universe)}
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-slate-300"
+              >
+                {UNIVERSES.map((u) => (
+                  <option key={u.value} value={u.value}>
+                    {u.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex flex-col gap-1.5">
+              <span className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                Time mode
+              </span>
+              <select
+                value={mode}
+                onChange={(e) => setMode(e.target.value as TimeMode)}
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-slate-300"
+              >
+                {MODES.map((m) => (
+                  <option key={m.value} value={m.value}>
+                    {m.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex flex-col gap-1.5">
+              <span className="text-xs font-medium uppercase tracking-wide text-slate-500">Rows</span>
+              <select
+                value={limit}
+                onChange={(e) => setLimit(Number(e.target.value))}
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-slate-300"
+              >
+                {LIMITS.map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
+        </Card>
 
-          <label className="flex min-w-[160px] flex-col gap-1.5">
-            <span className="text-xs font-medium uppercase tracking-wide text-slate-500">
-              Universe
-            </span>
-            <select
-              value={universe}
-              onChange={(e) => setUniverse(e.target.value as Universe)}
-              className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none ring-emerald-500/0 transition focus:ring-2 focus:ring-emerald-500/40"
-            >
-              {UNIVERSES.map((u) => (
-                <option key={u.value} value={u.value}>
-                  {u.label}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="flex min-w-[140px] flex-col gap-1.5">
-            <span className="text-xs font-medium uppercase tracking-wide text-slate-500">
-              Time mode
-            </span>
-            <select
-              value={mode}
-              onChange={(e) => setMode(e.target.value as TimeMode)}
-              className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:ring-2 focus:ring-emerald-500/40"
-            >
-              {MODES.map((m) => (
-                <option key={m.value} value={m.value}>
-                  {m.label}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="flex min-w-[100px] flex-col gap-1.5">
-            <span className="text-xs font-medium uppercase tracking-wide text-slate-500">
-              Rows
-            </span>
-            <select
-              value={limit}
-              onChange={(e) => setLimit(Number(e.target.value))}
-              className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:ring-2 focus:ring-emerald-500/40"
-            >
-              {LIMITS.map((n) => (
-                <option key={n} value={n}>
-                  {n}
-                </option>
-              ))}
-            </select>
-          </label>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <MetricCard label="Rows" value={String(displayRows.length)} />
+          <MetricCard label="Avg Move" value={formatPct(stats.avgMove)} tone={stats.avgMove >= 0 ? "positive" : "negative"} />
+          <MetricCard label="Advancers" value={String(stats.positive)} tone="positive" />
+          <MetricCard label="Decliners" value={String(stats.negative)} tone="negative" subtext={`Volume ${formatInt(stats.totalVolume)}`} />
         </div>
 
-        {error && (
-          <div
-            className="rounded-lg border border-rose-500/40 bg-rose-950/40 px-4 py-3 text-sm text-rose-200"
-            role="alert"
-          >
-            <p className="font-medium">Could not load market movers</p>
-            <p className="mt-1 text-rose-200/80">{error}</p>
-            <p className="mt-2 text-xs text-rose-200/60">
-              Ensure the API is running:{" "}
-              <code className="rounded bg-slate-950 px-1 py-0.5 text-rose-100">
-                uvicorn app.main:app --reload --app-dir backend
-              </code>{" "}
-              from the repo root, and that{" "}
-              <code className="rounded bg-slate-950 px-1 py-0.5">CORS_ORIGINS</code>{" "}
-              includes this site&apos;s origin.
-            </p>
-          </div>
-        )}
+        {error ? (
+          <Card className="border-rose-200 bg-rose-50">
+            <p className="text-sm font-semibold text-rose-700">Could not load market movers</p>
+            <p className="mt-1 text-sm text-rose-600">{error}</p>
+          </Card>
+        ) : null}
 
-        <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900/30 shadow-xl">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[880px] text-left text-sm">
+        <Card className="overflow-hidden p-0 shadow-md ring-1 ring-slate-200/80">
+          <div className="max-h-[min(70vh,780px)] overflow-auto">
+            <table className="w-full min-w-[720px] border-collapse text-left text-sm">
               <thead>
-                <tr className="border-b border-slate-800 bg-slate-900/80 text-xs uppercase tracking-wide text-slate-500">
-                  <th className="px-4 py-3">
-                    <button
-                      type="button"
-                      className="font-semibold hover:text-emerald-400"
-                      onClick={() => toggleSort("symbol")}
-                    >
-                      Symbol{sortIndicator("symbol")}
-                    </button>
-                  </th>
-                  <th className="px-4 py-3">
-                    <button
-                      type="button"
-                      className="font-semibold hover:text-emerald-400"
-                      onClick={() => toggleSort("company_name")}
-                    >
-                      Company{sortIndicator("company_name")}
-                    </button>
-                  </th>
-                  <th className="px-4 py-3 text-right">
-                    <button
-                      type="button"
-                      className="font-semibold hover:text-emerald-400"
-                      onClick={() => toggleSort("price")}
-                    >
-                      Price{sortIndicator("price")}
-                    </button>
-                  </th>
-                  <th className="px-4 py-3 text-right">
-                    <button
-                      type="button"
-                      className="font-semibold hover:text-emerald-400"
-                      onClick={() => toggleSort("change_percent")}
-                    >
-                      Chg %{sortIndicator("change_percent")}
-                    </button>
-                  </th>
-                  <th className="px-4 py-3 text-right">
-                    <button
-                      type="button"
-                      className="font-semibold hover:text-emerald-400"
-                      onClick={() => toggleSort("volume")}
-                    >
-                      Volume{sortIndicator("volume")}
-                    </button>
-                  </th>
-                  <th className="px-4 py-3 text-right">
-                    <button
-                      type="button"
-                      className="font-semibold hover:text-emerald-400"
-                      onClick={() => toggleSort("market_cap")}
-                    >
-                      Mkt cap{sortIndicator("market_cap")}
-                    </button>
-                  </th>
-                  <th className="px-4 py-3">
-                    <button
-                      type="button"
-                      className="font-semibold hover:text-emerald-400"
-                      onClick={() => toggleSort("sector")}
-                    >
-                      Sector{sortIndicator("sector")}
-                    </button>
-                  </th>
+                <tr className="shadow-[inset_0_-1px_0_0_rgb(226_232_240)]">
+                  <SortHeader label="Ticker" sortKey="symbol" />
+                  <SortHeader label="Last" sortKey="price" align="right" />
+                  <SortHeader label="% Chg" sortKey="change_percent" align="right" />
+                  <SortHeader label="Volume" sortKey="volume" align="right" />
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-slate-100 bg-white">
                 {loading && displayRows.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="px-4 py-12 text-center text-slate-500">
-                      Loading…
-                    </td>
-                  </tr>
+                  [...Array(6)].map((_, idx) => (
+                    <tr key={idx} className="border-0">
+                      <td className="px-5 py-3.5"><LoadingSkeleton className="h-5 w-20" /></td>
+                      <td className="px-5 py-3.5 text-right"><LoadingSkeleton className="ml-auto h-5 w-16" /></td>
+                      <td className="px-5 py-3.5 text-right"><LoadingSkeleton className="ml-auto h-5 w-20" /></td>
+                      <td className="px-5 py-3.5 text-right"><LoadingSkeleton className="ml-auto h-5 w-24" /></td>
+                    </tr>
+                  ))
                 ) : displayRows.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-12 text-center text-slate-500">
-                      No rows returned. Try another universe or refresh.
+                    <td colSpan={4} className="px-5 py-14 text-center text-sm text-slate-500">
+                      No rows returned. Try another tab, universe, or refresh.
                     </td>
                   </tr>
                 ) : (
                   displayRows.map((row) => (
                     <tr
                       key={row.symbol}
-                      className="cursor-pointer border-b border-slate-800/80 transition hover:bg-slate-800/40"
+                      className="cursor-pointer border-0 transition-colors duration-150 hover:bg-slate-50/90 hover:shadow-[inset_3px_0_0_0_rgb(15_23_42)]"
                       onClick={() => setSelected(row)}
                     >
-                      <td className="px-4 py-3 font-mono font-semibold text-emerald-400">
-                        {row.symbol}
+                      <td className="whitespace-nowrap px-5 py-3.5">
+                        <div className="flex items-center gap-2.5">
+                          <span className="font-mono text-sm font-semibold tracking-tight text-slate-900">
+                            {row.symbol}
+                          </span>
+                          <Badge
+                            label={
+                              row.change_percent == null
+                                ? "Flat"
+                                : row.change_percent >= 0
+                                  ? "Up"
+                                  : "Down"
+                            }
+                            variant={
+                              row.change_percent == null
+                                ? "neutral"
+                                : row.change_percent >= 0
+                                  ? "positive"
+                                  : "negative"
+                            }
+                          />
+                        </div>
                       </td>
-                      <td className="max-w-[200px] truncate px-4 py-3 text-slate-200">
-                        {row.company_name ?? "—"}
-                      </td>
-                      <td className="px-4 py-3 text-right tabular-nums text-slate-100">
+                      <td className="px-5 py-3.5 text-right font-medium tabular-nums text-slate-900">
                         {formatPrice(row.price)}
                       </td>
-                      <td
-                        className={`px-4 py-3 text-right tabular-nums ${
-                          row.change_percent == null
-                            ? "text-slate-500"
-                            : row.change_percent > 0
-                              ? "text-emerald-400"
-                              : row.change_percent < 0
-                                ? "text-rose-400"
-                                : "text-slate-300"
-                        }`}
-                      >
-                        {formatPct(row.change_percent)}
+                      <td className="px-5 py-3.5 text-right">
+                        <span
+                          className={`inline-flex min-w-[5.25rem] justify-end rounded-lg px-2.5 py-1 text-sm font-semibold tabular-nums ${changeCellClasses(row.change_percent)}`}
+                        >
+                          {formatPct(row.change_percent)}
+                        </span>
                       </td>
-                      <td className="px-4 py-3 text-right tabular-nums text-slate-400">
+                      <td className="px-5 py-3.5 text-right text-sm tabular-nums text-slate-600">
                         {formatInt(row.volume)}
-                      </td>
-                      <td className="px-4 py-3 text-right tabular-nums text-slate-400">
-                        {formatCap(row.market_cap)}
-                      </td>
-                      <td className="max-w-[140px] truncate px-4 py-3 text-slate-400">
-                        {row.sector ?? "—"}
                       </td>
                     </tr>
                   ))
@@ -410,11 +406,10 @@ export function MarketMoversView() {
               </tbody>
             </table>
           </div>
-        </div>
+        </Card>
 
-        <p className="text-center text-xs text-slate-600">
-          Click a row for details. &quot;Run research&quot; will hook into buy/sell or chat
-          when those routes exist.
+        <p className="text-center text-xs text-slate-500">
+          Click any row to view more context and launch research.
         </p>
       </div>
 
@@ -426,62 +421,61 @@ export function MarketMoversView() {
           aria-labelledby="mover-modal-title"
           onClick={() => setSelected(null)}
         >
-          <div
-            className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl border border-slate-700 bg-slate-900 p-6 shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 id="mover-modal-title" className="text-lg font-semibold text-white">
-              {selected.symbol}
-              {selected.company_name ? (
-                <span className="ml-2 font-normal text-slate-400">
-                  {selected.company_name}
-                </span>
-              ) : null}
-            </h2>
-            <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
-              <div>
-                <dt className="text-slate-500">Price</dt>
-                <dd className="font-mono text-slate-100">{formatPrice(selected.price)}</dd>
+          <div onClick={(e) => e.stopPropagation()}>
+            <Card className="max-h-[90vh] w-full max-w-lg overflow-y-auto p-6">
+              <h2 id="mover-modal-title" className="text-xl font-semibold text-slate-900">
+                {selected.symbol}
+                {selected.company_name ? (
+                  <span className="ml-2 font-normal text-slate-500">
+                    {selected.company_name}
+                  </span>
+                ) : null}
+              </h2>
+              <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <dt className="text-slate-500">Price</dt>
+                  <dd className="font-mono text-slate-900">{formatPrice(selected.price)}</dd>
+                </div>
+                <div>
+                  <dt className="text-slate-500">Change %</dt>
+                  <dd className="font-mono text-slate-900">
+                    {formatPct(selected.change_percent)}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-slate-500">52W high</dt>
+                  <dd className="font-mono text-slate-900">{formatPrice(selected.high_52w)}</dd>
+                </div>
+                <div>
+                  <dt className="text-slate-500">52W low</dt>
+                  <dd className="font-mono text-slate-900">{formatPrice(selected.low_52w)}</dd>
+                </div>
+                <div className="col-span-2">
+                  <dt className="text-slate-500">Industry</dt>
+                  <dd className="text-slate-800">{selected.industry ?? "—"}</dd>
+                </div>
+              </dl>
+              <div className="mt-6 flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
+                  onClick={() => {
+                    alert(
+                      `Run research for ${selected.symbol} — connect this to your Buy/Sell or Chat flow.`,
+                    );
+                  }}
+                >
+                  Run research
+                </button>
+                <button
+                  type="button"
+                  className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+                  onClick={() => setSelected(null)}
+                >
+                  Close
+                </button>
               </div>
-              <div>
-                <dt className="text-slate-500">Change %</dt>
-                <dd className="font-mono text-slate-100">
-                  {formatPct(selected.change_percent)}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-slate-500">52W high</dt>
-                <dd className="font-mono text-slate-100">{formatPrice(selected.high_52w)}</dd>
-              </div>
-              <div>
-                <dt className="text-slate-500">52W low</dt>
-                <dd className="font-mono text-slate-100">{formatPrice(selected.low_52w)}</dd>
-              </div>
-              <div className="col-span-2">
-                <dt className="text-slate-500">Industry</dt>
-                <dd className="text-slate-200">{selected.industry ?? "—"}</dd>
-              </div>
-            </dl>
-            <div className="mt-6 flex flex-wrap gap-3">
-              <button
-                type="button"
-                className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-emerald-400"
-                onClick={() => {
-                  alert(
-                    `Run research for ${selected.symbol} — connect this to your Buy/Sell or Chat flow.`,
-                  );
-                }}
-              >
-                Run research
-              </button>
-              <button
-                type="button"
-                className="rounded-lg border border-slate-600 px-4 py-2 text-sm font-medium text-slate-200 hover:bg-slate-800"
-                onClick={() => setSelected(null)}
-              >
-                Close
-              </button>
-            </div>
+            </Card>
           </div>
         </div>
       )}

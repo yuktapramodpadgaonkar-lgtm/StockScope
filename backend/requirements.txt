@@ -9,6 +9,7 @@ yfinance
 python-dotenv
 lxml
 numpy
+eval_type_backport  # Python 3.9 + Pydantic v2 compatibility for X|None syntax
 # ── LLM providers ─────────────────────────────────────────────────────────────
 # Gemini, Groq (LLaMA), and OpenRouter (Mistral) are all called via httpx REST.
 # No extra SDK packages required. FinBERT also uses the HF Inference REST API.

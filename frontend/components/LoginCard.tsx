@@ -47,16 +47,16 @@ export function LoginCard({ onLogin }: LoginCardProps) {
   }
 
   return (
-    <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 shadow-xl backdrop-blur sm:p-8">
-      <h2 className="text-lg font-semibold text-white">Sign in</h2>
-      <p className="mt-1 text-sm text-slate-400">
+    <div className="rounded-2xl border border-gray-200 bg-teal-50/60 p-6 shadow-xl backdrop-blur sm:p-8">
+      <h2 className="text-lg font-semibold text-gray-900">Sign in</h2>
+      <p className="mt-1 text-sm text-gray-500">
         Signs in through the FastAPI mock auth endpoint; email and token are stored in this
         browser only (localStorage).
       </p>
 
       <form className="mt-6 space-y-4" onSubmit={(e) => void handleSubmit(e)} noValidate>
         <div>
-          <label htmlFor="login-email" className="text-xs font-medium uppercase tracking-wide text-slate-500">
+          <label htmlFor="login-email" className="text-xs font-medium uppercase tracking-wide text-gray-400">
             Email
           </label>
           <input
@@ -66,14 +66,14 @@ export function LoginCard({ onLogin }: LoginCardProps) {
             autoComplete="username"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="mt-1.5 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none ring-emerald-500/0 transition focus:ring-2 focus:ring-emerald-500/40"
+            className="mt-1.5 w-full rounded-lg border border-teal-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none ring-teal-500/0 transition focus:ring-2 focus:ring-teal-500/40"
             placeholder="you@example.com"
           />
         </div>
         <div>
           <label
             htmlFor="login-password"
-            className="text-xs font-medium uppercase tracking-wide text-slate-500"
+            className="text-xs font-medium uppercase tracking-wide text-gray-400"
           >
             Password
           </label>
@@ -84,7 +84,7 @@ export function LoginCard({ onLogin }: LoginCardProps) {
             autoComplete="current-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="mt-1.5 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:ring-2 focus:ring-emerald-500/40"
+            className="mt-1.5 w-full rounded-lg border border-teal-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-teal-500/40"
             placeholder="••••••••"
           />
         </div>
@@ -98,7 +98,7 @@ export function LoginCard({ onLogin }: LoginCardProps) {
         <button
           type="submit"
           disabled={loading}
-          className="w-full rounded-lg bg-emerald-500 py-2.5 text-sm font-semibold text-slate-950 shadow-md shadow-emerald-500/15 transition hover:bg-emerald-400 disabled:opacity-60"
+          className="w-full rounded-lg bg-teal-500 py-2.5 text-sm font-semibold text-white shadow-md shadow-teal-500/15 transition hover:bg-teal-400 disabled:opacity-60"
         >
           {loading ? "Signing in…" : "Sign in"}
         </button>

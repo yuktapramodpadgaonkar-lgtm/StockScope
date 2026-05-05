@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """Chatbot API (Week 1 stub)."""
 
 from fastapi import APIRouter, HTTPException

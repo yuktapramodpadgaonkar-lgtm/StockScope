@@ -3,6 +3,7 @@ export type ChatIntent =
   | "sentiment_question"
   | "comparison_question"
   | "history_lookup"
+  | "financial_advice_rejected"
   | "unknown";
 
 export type ChatCitation = {

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """User history API with lightweight persistence."""
 
 from fastapi import APIRouter, HTTPException

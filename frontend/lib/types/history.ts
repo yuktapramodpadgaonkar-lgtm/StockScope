@@ -22,3 +22,14 @@ export type HistoryResponse = {
   research_history: ResearchHistoryItem[];
   saved_prompts: SavedPromptItem[];
 };
+
+export type ThreadMessage = {
+  role: string;
+  text: string;
+  timestamp: string;
+};
+
+export type ThreadHistoryResponse = {
+  thread_id: string;
+  messages: ThreadMessage[];
+};

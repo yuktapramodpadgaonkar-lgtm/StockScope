@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """Pydantic models for history APIs."""
 
 from pydantic import BaseModel, Field

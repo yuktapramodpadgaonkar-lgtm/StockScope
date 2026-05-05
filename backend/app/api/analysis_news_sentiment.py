@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """News sentiment analysis API (Week 1 mock)."""
 
 from fastapi import APIRouter, HTTPException

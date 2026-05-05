@@ -1,13 +1,8 @@
 import type { Metadata } from "next";
-import { DM_Sans } from "next/font/google";
 
+import { FloatingChatButton } from "@/components/FloatingChatButton";
 import { Navbar } from "@/components/Navbar";
 import "./globals.css";
-
-const dmSans = DM_Sans({
-  subsets: ["latin"],
-  variable: "--font-sans",
-});
 
 export const metadata: Metadata = {
   title: "StockScope AI",
@@ -21,9 +16,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${dmSans.variable} min-h-screen font-sans antialiased`}>
+      <body className="min-h-screen font-sans antialiased">
         <Navbar />
         {children}
+        <FloatingChatButton />
       </body>
     </html>
   );

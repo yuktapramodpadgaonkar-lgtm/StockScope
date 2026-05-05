@@ -9,7 +9,7 @@ export function getApiBase(): string {
   return base.replace(/\/$/, "");
 }
 
-async function readErrorMessage(res: Response): Promise<string> {
+export async function readErrorMessage(res: Response): Promise<string> {
   const text = await res.text();
   try {
     const j = JSON.parse(text) as { detail?: unknown };
@@ -23,7 +23,14 @@ async function readErrorMessage(res: Response): Promise<string> {
   } catch {
     /* use raw text */
   }
-  return text || `Request failed (${res.status})`;
+  const t = text.trim();
+  if (t.startsWith("<!") || /<\s*html/i.test(t) || t === "Internal Server Error") {
+    return `Server error (${res.status}). Ensure the API is running at ${getApiBase()}.`;
+  }
+  if (t.length > 400) {
+    return `Request failed (${res.status}). The server returned an unexpected response.`;
+  }
+  return t || `Request failed (${res.status})`;
 }
 
 /** POST /api/auth/login — same contract as FastAPI mock auth. */

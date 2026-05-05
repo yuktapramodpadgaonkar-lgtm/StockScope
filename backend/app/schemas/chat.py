@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """Pydantic models for chat API contracts."""
 
 from typing import Literal

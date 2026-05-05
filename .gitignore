@@ -26,3 +26,7 @@ Thumbs.db
 frontend/node_modules/
 frontend/.next/
 frontend/out/
+frontend/tsconfig.tsbuildinfo
+
+# Local API persistence (user-specific; recreated by backend)
+backend/data/history_store.json

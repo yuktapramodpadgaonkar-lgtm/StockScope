@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """Pydantic models for news sentiment analysis API."""
 
 from typing import Literal

@@ -1,25 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { Card } from "@/components/ui/Card";
+import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
+import { MetricCard } from "@/components/ui/MetricCard";
 import {
   fetchFundamentalAnalysis,
   type FundamentalAnalysisResponse,
-  type FundamentalMetrics,
 } from "@/lib/fundamental-api";
-
-const METRIC_ROWS: { key: keyof FundamentalMetrics; label: string }[] = [
-  { key: "market_cap", label: "Market cap" },
-  { key: "trailing_pe", label: "Trailing P/E" },
-  { key: "forward_pe", label: "Forward P/E" },
-  { key: "profit_margin_pct", label: "Profit margin" },
-  { key: "operating_margin_pct", label: "Operating margin" },
-  { key: "roe_pct", label: "Return on equity" },
-  { key: "debt_to_equity", label: "Debt / equity" },
-  { key: "current_ratio", label: "Current ratio" },
-  { key: "revenue_growth_yoy_pct", label: "Revenue growth (YoY)" },
-  { key: "earnings_growth_yoy_pct", label: "Earnings growth (YoY)" },
-  { key: "dividend_yield_pct", label: "Dividend yield" },
-];
+import { SectionCard } from "@/components/fundamental/SectionCard";
+import { VerdictBadge } from "@/components/fundamental/VerdictBadge";
 
 function formatCap(n: number | null | undefined): string {
   if (n == null || Number.isNaN(n)) return "—";
@@ -37,31 +27,14 @@ function formatPrice(n: number | null | undefined): string {
   });
 }
 
-function formatMaybePct(n: number | null | undefined): string {
+function formatPct(n: number | null | undefined): string {
   if (n == null || Number.isNaN(n)) return "—";
   return `${n.toFixed(2)}%`;
 }
 
-function formatRatio(n: number | null | undefined): string {
+function formatNum(n: number | null | undefined): string {
   if (n == null || Number.isNaN(n)) return "—";
   return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
-}
-
-function formatMetricValue(key: keyof FundamentalMetrics, n: number | null): string {
-  if (n == null || Number.isNaN(n)) return "—";
-  if (key === "market_cap") return formatCap(n);
-  if (
-    key === "profit_margin_pct" ||
-    key === "operating_margin_pct" ||
-    key === "roe_pct" ||
-    key === "revenue_growth_yoy_pct" ||
-    key === "earnings_growth_yoy_pct" ||
-    key === "dividend_yield_pct"
-  ) {
-    return formatMaybePct(n);
-  }
-  if (key === "trailing_pe" || key === "forward_pe") return formatRatio(n);
-  return formatRatio(n);
 }
 
 type FundamentalReportProps = {
@@ -72,6 +45,7 @@ type FundamentalReportProps = {
 export function FundamentalReport({ defaultTicker = "AAPL" }: FundamentalReportProps) {
   const [input, setInput] = useState(defaultTicker);
   const [report, setReport] = useState<FundamentalAnalysisResponse | null>(null);
+  const [hasSearched, setHasSearched] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -81,6 +55,7 @@ export function FundamentalReport({ defaultTicker = "AAPL" }: FundamentalReportP
       setError("Enter a ticker symbol.");
       return;
     }
+    setHasSearched(true);
     setLoading(true);
     setError(null);
     try {
@@ -95,132 +70,187 @@ export function FundamentalReport({ defaultTicker = "AAPL" }: FundamentalReportP
   }, []);
 
   useEffect(() => {
-    void load(defaultTicker);
-  }, [defaultTicker, load]);
+    setInput(defaultTicker);
+  }, [defaultTicker]);
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-        <label className="flex min-w-[200px] flex-1 flex-col gap-1.5">
-          <span className="text-xs font-medium uppercase tracking-wide text-slate-500">
-            Ticker
-          </span>
-          <input
-            value={input}
-            onChange={(e) => setInput(e.target.value.toUpperCase())}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") void load(input);
-            }}
-            placeholder="e.g. AAPL"
-            className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-sm text-slate-100 outline-none ring-emerald-500/0 transition focus:ring-2 focus:ring-emerald-500/40"
-            autoComplete="off"
-            spellCheck={false}
-          />
-        </label>
-        <button
-          type="button"
-          onClick={() => void load(input)}
-          disabled={loading}
-          className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-slate-950 shadow-md shadow-emerald-500/15 transition hover:bg-emerald-400 disabled:opacity-60"
-        >
-          {loading ? "Loading…" : "Analyze"}
-        </button>
-      </div>
+      <Card>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+          <label className="flex min-w-[220px] flex-1 flex-col gap-1.5">
+            <span className="text-xs font-medium uppercase tracking-wide text-slate-500">Ticker</span>
+            <input
+              value={input}
+              onChange={(e) => setInput(e.target.value.toUpperCase())}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void load(input);
+              }}
+              placeholder="e.g. AAPL"
+              className="rounded-xl border border-slate-300 bg-white px-3 py-2.5 font-mono text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+              autoComplete="off"
+              spellCheck={false}
+            />
+          </label>
+          <button
+            type="button"
+            onClick={() => void load(input)}
+            disabled={loading}
+            className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:opacity-60"
+          >
+            {loading ? "Analyzing..." : "Analyze"}
+          </button>
+        </div>
+      </Card>
 
       {error && (
-        <div
-          className="rounded-lg border border-rose-500/40 bg-rose-950/40 px-4 py-3 text-sm text-rose-200"
-          role="alert"
-        >
-          <p className="font-medium">Could not load report</p>
-          <p className="mt-1 text-rose-200/80">{error}</p>
+        <Card className="border-rose-200 bg-rose-50">
+          <p className="text-sm font-medium text-rose-800">Could not load report</p>
+          <p className="mt-1 text-sm text-rose-700">{error}</p>
+        </Card>
+      )}
+
+      {loading && (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {[...Array(8)].map((_, i) => (
+            <Card key={i} className="p-4">
+              <LoadingSkeleton className="h-4 w-24" />
+              <LoadingSkeleton className="mt-3 h-7 w-28" />
+            </Card>
+          ))}
         </div>
       )}
 
-      {report && !loading && (
+      {!loading && !report && !error && !hasSearched && (
+        <Card className="text-center">
+          <p className="text-sm text-slate-600">
+            Enter a ticker symbol and click <span className="font-medium text-slate-800">Analyze</span> to load a
+            fundamental health report.
+          </p>
+        </Card>
+      )}
+
+      {report && !loading && hasSearched && (
         <div className="space-y-6">
-          <header className="rounded-xl border border-slate-800 bg-slate-900/40 p-5 shadow-xl backdrop-blur">
+          <Card>
             <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
               <div>
-                <p className="font-mono text-sm font-semibold text-emerald-400">{report.ticker}</p>
-                <h2 className="mt-1 text-xl font-semibold tracking-tight text-white">
+                <p className="font-mono text-sm font-semibold text-slate-600">{report.ticker}</p>
+                <h2 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">
                   {report.company_name}
                 </h2>
               </div>
               {report.current_price != null && (
-                <p className="text-2xl font-semibold tabular-nums text-slate-100">
+                <p className="text-3xl font-semibold tabular-nums text-slate-900">
                   {formatPrice(report.current_price)}
                 </p>
               )}
             </div>
-            <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+            <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
               <div>
                 <dt className="text-slate-500">Sector</dt>
-                <dd className="text-slate-200">{report.sector}</dd>
+                <dd className="text-slate-800">{report.sector}</dd>
               </div>
               <div>
                 <dt className="text-slate-500">Industry</dt>
-                <dd className="text-slate-200">{report.industry}</dd>
+                <dd className="text-slate-800">{report.industry}</dd>
+              </div>
+              <div className="flex items-center sm:justify-end lg:justify-start">
+                <VerdictBadge verdict={report.verdict} />
               </div>
             </dl>
-          </header>
+          </Card>
 
-          <section className="rounded-xl border border-slate-800 bg-slate-900/30 p-5 shadow-xl">
-            <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-              Metrics
-            </h3>
-            <div className="mt-4 overflow-x-auto">
-              <table className="w-full min-w-[320px] text-left text-sm">
-                <tbody>
-                  {METRIC_ROWS.map(({ key, label }) => (
-                    <tr key={key} className="border-b border-slate-800/80 last:border-0">
-                      <th className="py-2 pr-4 font-normal text-slate-400">{label}</th>
-                      <td className="py-2 text-right font-mono tabular-nums text-slate-100">
-                        {formatMetricValue(key, report.metrics[key])}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="transition-transform duration-150 hover:-translate-y-0.5">
+              <MetricCard label="Market Cap" value={formatCap(report.metrics.market_cap)} />
             </div>
-          </section>
+            <div className="transition-transform duration-150 hover:-translate-y-0.5">
+              <MetricCard label="P/E Ratio" value={formatNum(report.metrics.trailing_pe)} />
+            </div>
+            <div className="transition-transform duration-150 hover:-translate-y-0.5">
+              <MetricCard label="EPS" value={formatNum(report.metrics.earnings_growth_yoy_pct)} subtext="YoY growth proxy" />
+            </div>
+            <div className="transition-transform duration-150 hover:-translate-y-0.5">
+              <MetricCard label="Revenue" value={formatPct(report.metrics.revenue_growth_yoy_pct)} subtext="YoY growth" />
+            </div>
+            <div className="transition-transform duration-150 hover:-translate-y-0.5">
+              <MetricCard label="Profit Margin" value={formatPct(report.metrics.profit_margin_pct)} />
+            </div>
+            <div className="transition-transform duration-150 hover:-translate-y-0.5">
+              <MetricCard label="Debt/Equity" value={formatNum(report.metrics.debt_to_equity)} />
+            </div>
+            <div className="transition-transform duration-150 hover:-translate-y-0.5">
+              <MetricCard label="Beta" value="—" subtext="Not available in current API payload" />
+            </div>
+            <div className="transition-transform duration-150 hover:-translate-y-0.5">
+              <MetricCard label="Dividend Yield" value={formatPct(report.metrics.dividend_yield_pct)} />
+            </div>
+          </div>
+
+          <SectionCard
+            title="Financial Health Summary"
+            subtitle="Blended view from valuation, profitability, leverage, and growth snapshots."
+          >
+            <div className="grid gap-3 text-sm text-slate-700 sm:grid-cols-2 lg:grid-cols-3">
+              <p>
+                <span className="font-medium text-slate-900">Forward P/E:</span>{" "}
+                <span className="tabular-nums">{formatNum(report.metrics.forward_pe)}</span>
+              </p>
+              <p>
+                <span className="font-medium text-slate-900">Operating Margin:</span>{" "}
+                <span className="tabular-nums">{formatPct(report.metrics.operating_margin_pct)}</span>
+              </p>
+              <p>
+                <span className="font-medium text-slate-900">ROE:</span>{" "}
+                <span className="tabular-nums">{formatPct(report.metrics.roe_pct)}</span>
+              </p>
+              <p>
+                <span className="font-medium text-slate-900">Current Ratio:</span>{" "}
+                <span className="tabular-nums">{formatNum(report.metrics.current_ratio)}</span>
+              </p>
+              <p>
+                <span className="font-medium text-slate-900">Earnings Growth:</span>{" "}
+                <span className="tabular-nums">{formatPct(report.metrics.earnings_growth_yoy_pct)}</span>
+              </p>
+            </div>
+          </SectionCard>
 
           <div className="grid gap-6 lg:grid-cols-2">
-            <section className="rounded-xl border border-emerald-500/20 bg-emerald-950/20 p-5">
-              <h3 className="text-sm font-semibold uppercase tracking-wide text-emerald-400/90">
-                Strengths
-              </h3>
-              <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-slate-200">
+            <SectionCard title="Strengths" className="border-emerald-200 bg-emerald-50/60">
+              <ul className="mt-2 list-disc space-y-2 pl-5 text-sm text-slate-800">
                 {report.strengths.map((s, i) => (
                   <li key={`strength-${i}`}>{s}</li>
                 ))}
               </ul>
-            </section>
-            <section className="rounded-xl border border-amber-500/20 bg-amber-950/15 p-5">
-              <h3 className="text-sm font-semibold uppercase tracking-wide text-amber-300/90">
-                Risks
-              </h3>
-              <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-slate-200">
+            </SectionCard>
+            <SectionCard title="Risks" className="border-amber-200 bg-amber-50/60">
+              <ul className="mt-2 list-disc space-y-2 pl-5 text-sm text-slate-800">
                 {report.risks.map((r, i) => (
                   <li key={`risk-${i}`}>{r}</li>
                 ))}
               </ul>
-            </section>
+            </SectionCard>
           </div>
 
-          <section className="rounded-xl border border-slate-800 bg-slate-900/50 p-5">
-            <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-              Verdict
-            </h3>
-            <p className="mt-2 text-lg font-medium text-white">{report.verdict}</p>
-          </section>
+          <SectionCard title="Final Verdict" subtitle="High-level signal from current fundamental scoring.">
+            <div className="flex flex-wrap items-center gap-3">
+              <VerdictBadge verdict={report.verdict} />
+              <p className="text-sm text-slate-700">{report.verdict}</p>
+            </div>
+          </SectionCard>
 
-          <p className="text-xs leading-relaxed text-slate-500">{report.disclaimer}</p>
+          <SectionCard
+            title="Citations / Data Sources"
+            subtitle="Current fundamentals are sourced from backend provider snapshots (yfinance)."
+          >
+            <ul className="list-disc space-y-1 pl-5 text-sm text-slate-700">
+              <li>Market data provider configured in backend settings</li>
+              <li>Server-side fundamental service computes strengths/risks/verdict</li>
+              <li>Ticker lookup: {report.ticker}</li>
+            </ul>
+            <p className="mt-4 text-xs leading-relaxed text-slate-500">{report.disclaimer}</p>
+          </SectionCard>
         </div>
-      )}
-
-      {loading && !report && (
-        <p className="text-center text-sm text-slate-500">Loading fundamental data…</p>
       )}
     </div>
   );

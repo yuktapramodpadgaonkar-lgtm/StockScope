@@ -3,19 +3,20 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
-import { HistoryList } from "@/components/HistoryList";
+import { HistoryFilterTabs } from "@/components/history/HistoryFilterTabs";
+import { HistoryList } from "@/components/history/HistoryList";
+import { HistorySearchBar } from "@/components/history/HistorySearchBar";
+import type { HistoryFilterTab } from "@/components/history/historyUtils";
+import { matchesFilter, matchesSearch, mergeHistoryItems } from "@/components/history/historyUtils";
 import { fetchHistory } from "@/lib/revati-api";
-import type {
-  ChatHistoryItem,
-  HistoryResponse,
-  ResearchHistoryItem,
-  SavedPromptItem,
-} from "@/lib/revati-types";
+import type { HistoryResponse } from "@/lib/revati-types";
 
 export default function HistoryPage() {
   const [data, setData] = useState<HistoryResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [filterTab, setFilterTab] = useState<HistoryFilterTab>("all");
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -37,63 +38,73 @@ export default function HistoryPage() {
     };
   }, []);
 
-  const chatRows = useMemo(
-    () =>
-      (data?.chat_history ?? []).map((c: ChatHistoryItem) => ({
-        id: c.thread_id,
-        title: c.title,
-        subtitle: `Updated ${c.last_updated} · ${c.thread_id}`,
-      })),
-    [data],
-  );
+  const merged = useMemo(() => mergeHistoryItems(data), [data]);
 
-  const researchRows = useMemo(
-    () =>
-      (data?.research_history ?? []).map((r: ResearchHistoryItem) => ({
-        id: r.id,
-        title: `${r.type} · ${r.ticker}`,
-        subtitle: r.created_at,
-      })),
-    [data],
-  );
+  const filtered = useMemo(() => {
+    return merged.filter((item) => matchesFilter(item, filterTab) && matchesSearch(item, search));
+  }, [merged, filterTab, search]);
 
-  const promptRows = useMemo(
-    () =>
-      (data?.saved_prompts ?? []).map((p: SavedPromptItem) => ({
-        id: p.id,
-        title: p.title,
-        subtitle: p.prompt_text,
-      })),
-    [data],
-  );
+  const hasActiveFilters = filterTab !== "all" || search.trim().length > 0;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-950 to-slate-900">
-      <header className="border-b border-slate-800/80 bg-slate-950/80 backdrop-blur">
-        <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6 lg:px-8">
-          <Link href="/" className="text-sm font-medium text-emerald-400/90 hover:text-emerald-300">
+    <div className="min-h-screen bg-slate-100/80">
+      <div className="border-b border-slate-200/90 bg-white/95 shadow-sm">
+        <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
+          <Link
+            href="/"
+            className="text-sm font-semibold text-teal-700 transition hover:text-teal-800"
+          >
             ← Home
           </Link>
-          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white">History</h1>
-          <p className="mt-1 text-sm text-slate-400">
-            Mock records from <code className="text-emerald-400/80">GET /api/history</code> for UI wiring.
+          <h1 className="mt-4 text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">
+            Research History
+          </h1>
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-600 sm:text-base">
+            View previous chatbot queries, stock analyses, and saved research activity.
           </p>
         </div>
-      </header>
+      </div>
 
-      <div className="mx-auto max-w-3xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
-        {error ? <p className="text-sm text-rose-400">{error}</p> : null}
+      <div className="mx-auto max-w-4xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
+        {error ? (
+          <div
+            className="rounded-2xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm text-rose-900 shadow-sm"
+            role="alert"
+          >
+            <p className="font-semibold">Could not load history</p>
+            <p className="mt-1 text-rose-800/90">{error}</p>
+            <p className="mt-3 text-xs text-rose-700/80">
+              Check that the API is running and <code className="rounded bg-rose-100 px-1">NEXT_PUBLIC_API_BASE_URL</code>{" "}
+              is correct.
+            </p>
+          </div>
+        ) : null}
 
-        <HistoryList title="Chat history" loading={loading} rows={chatRows} emptyMessage="No chat threads yet." />
+        {!error ? (
+          <>
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <HistoryFilterTabs value={filterTab} onChange={setFilterTab} />
+              <div className="w-full lg:max-w-sm">
+                <HistorySearchBar value={search} onChange={setSearch} />
+              </div>
+            </div>
 
-        <HistoryList
-          title="Research history"
-          loading={loading}
-          rows={researchRows}
-          emptyMessage="No research runs yet."
-        />
-
-        <HistoryList title="Saved prompts" loading={loading} rows={promptRows} emptyMessage="No saved prompts yet." />
+            <HistoryList
+              items={filtered}
+              loading={loading}
+              emptyState={{
+                title: "No activity yet",
+                description:
+                  "Run a chat query, sentiment check, or analysis from the app—your research trail will show up here.",
+              }}
+              filteredEmptyMessage={{
+                title: "No history found",
+                description: "Nothing matches your filters or search. Try another tab or clear the search box.",
+              }}
+              hasActiveFilters={hasActiveFilters}
+            />
+          </>
+        ) : null}
       </div>
     </div>
   );

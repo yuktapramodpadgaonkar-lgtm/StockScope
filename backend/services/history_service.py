@@ -6,7 +6,9 @@ import json
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Type, TypeVar
+
+from pydantic import BaseModel
 
 from app.schemas.history import (
     ChatHistoryItem,
@@ -19,6 +21,21 @@ from app.schemas.history import (
 )
 
 _STORE_PATH = Path(__file__).resolve().parents[1] / "data" / "history_store.json"
+
+M = TypeVar("M", bound=BaseModel)
+
+
+def _validated_rows(raw: list[Any], model: Type[M]) -> list[M]:
+    """Skip invalid rows so one bad JSON entry cannot 500 the whole /api/history response."""
+    out: list[M] = []
+    for row in raw:
+        if not isinstance(row, dict):
+            continue
+        try:
+            out.append(model.model_validate(row))
+        except Exception:
+            continue
+    return out
 
 
 def _utc_now_iso() -> str:
@@ -93,9 +110,9 @@ def get_history() -> HistoryResponse:
     """Return persisted chat, research and saved prompt history."""
     store = _load_store()
     return HistoryResponse(
-        chat_history=[ChatHistoryItem.model_validate(x) for x in store.get("chat_history", [])],
-        research_history=[ResearchHistoryItem.model_validate(x) for x in store.get("research_history", [])],
-        saved_prompts=[SavedPromptItem.model_validate(x) for x in store.get("saved_prompts", [])],
+        chat_history=_validated_rows(list(store.get("chat_history", [])), ChatHistoryItem),
+        research_history=_validated_rows(list(store.get("research_history", [])), ResearchHistoryItem),
+        saved_prompts=_validated_rows(list(store.get("saved_prompts", [])), SavedPromptItem),
     )
 
 
@@ -103,9 +120,12 @@ def get_thread_history(thread_id: str) -> ThreadHistoryResponse:
     """Return messages for a thread id (empty if missing)."""
     store = _load_store()
     thread = store.get("threads", {}).get(thread_id, {})
+    raw_messages = thread.get("messages", [])
+    if not isinstance(raw_messages, list):
+        raw_messages = []
     return ThreadHistoryResponse(
         thread_id=thread_id,
-        messages=[ThreadMessage.model_validate(m) for m in thread.get("messages", [])],
+        messages=_validated_rows(raw_messages, ThreadMessage),
     )
 
 
