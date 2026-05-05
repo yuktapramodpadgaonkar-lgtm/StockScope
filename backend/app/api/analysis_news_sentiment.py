@@ -21,6 +21,7 @@ def post_news_sentiment(body: NewsSentimentRequest) -> NewsSentimentResponse:
             body.date_from,
             body.date_to,
             max_articles=body.max_articles,
+            model_name=body.model_name,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e

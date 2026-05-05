@@ -61,6 +61,23 @@ class Settings(BaseSettings):
     # Phase 8 — evaluation harness (see backend/evaluation/)
     eval_output_dir: str = ""  # optional override; default writes under data/eval/
 
+    # ── Multi-LLM providers (Gemini · LLaMA/Groq · Mistral/OpenRouter) ──────
+    # Set at least one key; call_llm_with_fallback tries them in order.
+    gemini_api_key: str = ""
+    gemini_model: str = "gemini-1.5-flash"
+    groq_api_key: str = ""
+    groq_model: str = "llama3-8b-8192"
+    openrouter_api_key: str = ""
+    openrouter_model: str = "mistralai/mistral-7b-instruct"
+    # Which provider to try first when no explicit preference is given.
+    default_llm_provider: str = "gemini"  # gemini | llama | mistral
+
+    # ── FinBERT sentiment (Phase N) ──────────────────────────────────────────
+    # Reuses huggingface_api_token from Phase 4. Set finbert_enabled=false to
+    # stay on the keyword heuristic without an HF token.
+    finbert_enabled: bool = True
+    finbert_model_id: str = "ProsusAI/finbert"
+
     model_config = SettingsConfigDict(
         env_file=str(_BACKEND_DIR / ".env"),
         env_file_encoding="utf-8",

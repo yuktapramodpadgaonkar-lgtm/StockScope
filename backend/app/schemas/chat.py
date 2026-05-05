@@ -9,6 +9,7 @@ ChatIntent = Literal[
     "sentiment_question",
     "comparison_question",
     "history_lookup",
+    "financial_advice_rejected",
     "unknown",
 ]
 
@@ -16,6 +17,10 @@ ChatIntent = Literal[
 class ChatQueryRequest(BaseModel):
     query: str = Field(..., min_length=1, max_length=4000, description="User question")
     thread_id: str | None = Field(default=None, max_length=128)
+    model_name: str | None = Field(
+        default=None,
+        description="LLM to use: gemini | llama | mistral (falls back to config default)",
+    )
 
 
 class ChatCitation(BaseModel):
@@ -34,3 +39,5 @@ class ChatQueryResponse(BaseModel):
     citations: list[ChatCitation]
     disclaimer: str
     timestamp: str
+    safety_triggered: bool = False
+    llm_model_used: str | None = None

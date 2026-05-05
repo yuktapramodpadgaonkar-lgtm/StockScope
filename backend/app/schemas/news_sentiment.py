@@ -12,6 +12,10 @@ class NewsSentimentRequest(BaseModel):
     date_from: str | None = Field(default=None, description="ISO date YYYY-MM-DD")
     date_to: str | None = Field(default=None, description="ISO date YYYY-MM-DD")
     max_articles: int = Field(default=10, ge=1, le=50)
+    model_name: str | None = Field(
+        default=None,
+        description="LLM for theme generation: gemini | llama | mistral",
+    )
 
 
 class AggregateSentiment(BaseModel):
@@ -48,3 +52,4 @@ class NewsSentimentResponse(BaseModel):
     citations: list[CitationItem]
     disclaimer: str
     fallback_used: bool
+    llm_model_used: str | None = None

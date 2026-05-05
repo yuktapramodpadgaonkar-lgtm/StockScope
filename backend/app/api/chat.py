@@ -16,6 +16,6 @@ def post_chat_query(body: ChatQueryRequest) -> ChatQueryResponse:
     TODO: Swap ``handle_chat_query`` for agent + retrieval pipeline.
     """
     try:
-        return handle_chat_query(body.query, body.thread_id)
+        return handle_chat_query(body.query, body.thread_id, model_name=body.model_name)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
