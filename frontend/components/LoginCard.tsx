@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
 
@@ -46,17 +47,35 @@ export function LoginCard({ onLogin }: LoginCardProps) {
     }
   }
 
-  return (
-    <div className="rounded-2xl border border-gray-200 bg-teal-50/60 p-6 shadow-xl backdrop-blur sm:p-8">
-      <h2 className="text-lg font-semibold text-gray-900">Sign in</h2>
-      <p className="mt-1 text-sm text-gray-500">
-        Signs in through the FastAPI mock auth endpoint; email and token are stored in this
-        browser only (localStorage).
-      </p>
+  const inputClassName =
+    "mt-2 w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-gray-900 shadow-sm outline-none transition placeholder:text-gray-400 focus:border-teal-600 focus:ring-2 focus:ring-teal-600/20 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-teal-500 dark:focus:ring-teal-500/25";
 
-      <form className="mt-6 space-y-4" onSubmit={(e) => void handleSubmit(e)} noValidate>
+  const labelClassName =
+    "text-sm font-medium text-gray-700 dark:text-gray-300";
+
+  return (
+    <div className="w-full rounded-2xl border border-gray-200/90 bg-white p-8 shadow-lg shadow-gray-200/40 dark:border-gray-800 dark:bg-gray-900 dark:shadow-black/30 sm:p-10">
+      <div className="mb-8 flex flex-col items-center text-center">
+        <div
+          className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-teal-700 text-lg font-bold text-white shadow-md shadow-teal-900/20 dark:bg-teal-600 dark:shadow-teal-950/40"
+          aria-hidden
+        >
+          S
+        </div>
+        <p className="text-sm font-semibold tracking-wide text-teal-700 dark:text-teal-400">
+          StockScope
+        </p>
+        <h1 className="mt-3 text-2xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">
+          Welcome back
+        </h1>
+        <p className="mt-2 max-w-sm text-sm leading-relaxed text-gray-600 dark:text-gray-400">
+          Log in to continue your financial research
+        </p>
+      </div>
+
+      <form className="space-y-5" onSubmit={(e) => void handleSubmit(e)} noValidate>
         <div>
-          <label htmlFor="login-email" className="text-xs font-medium uppercase tracking-wide text-gray-400">
+          <label htmlFor="login-email" className={labelClassName}>
             Email
           </label>
           <input
@@ -66,15 +85,12 @@ export function LoginCard({ onLogin }: LoginCardProps) {
             autoComplete="username"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="mt-1.5 w-full rounded-lg border border-teal-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none ring-teal-500/0 transition focus:ring-2 focus:ring-teal-500/40"
+            className={inputClassName}
             placeholder="you@example.com"
           />
         </div>
         <div>
-          <label
-            htmlFor="login-password"
-            className="text-xs font-medium uppercase tracking-wide text-gray-400"
-          >
+          <label htmlFor="login-password" className={labelClassName}>
             Password
           </label>
           <input
@@ -84,25 +100,38 @@ export function LoginCard({ onLogin }: LoginCardProps) {
             autoComplete="current-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="mt-1.5 w-full rounded-lg border border-teal-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-teal-500/40"
+            className={inputClassName}
             placeholder="••••••••"
           />
         </div>
 
-        {error && (
-          <p className="rounded-lg border border-rose-500/40 bg-rose-950/40 px-3 py-2 text-sm text-rose-200" role="alert">
+        {error ? (
+          <p
+            className="rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-2.5 text-sm text-rose-800 dark:border-rose-500/35 dark:bg-rose-950/50 dark:text-rose-200"
+            role="alert"
+          >
             {error}
           </p>
-        )}
+        ) : null}
 
         <button
           type="submit"
           disabled={loading}
-          className="w-full rounded-lg bg-teal-500 py-2.5 text-sm font-semibold text-white shadow-md shadow-teal-500/15 transition hover:bg-teal-400 disabled:opacity-60"
+          className="w-full rounded-xl bg-teal-700 py-3 text-sm font-semibold text-white shadow-md shadow-teal-900/15 transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-teal-600 dark:shadow-teal-950/30 dark:hover:bg-teal-500"
         >
-          {loading ? "Signing in…" : "Sign in"}
+          {loading ? "Signing in…" : "Log in"}
         </button>
       </form>
+
+      <p className="mt-8 text-center text-sm text-gray-600 dark:text-gray-400">
+        Don&apos;t have an account?{" "}
+        <Link
+          href="/signup"
+          className="font-semibold text-teal-700 underline-offset-4 hover:text-teal-800 hover:underline dark:text-teal-400 dark:hover:text-teal-300"
+        >
+          Sign up
+        </Link>
+      </p>
     </div>
   );
 }
