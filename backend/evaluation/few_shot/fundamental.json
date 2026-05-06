@@ -1,0 +1,13 @@
+{
+  "description": "Short educational fundamental explanation using only provided metrics (include_llm path).",
+  "shots": [
+    {
+      "label": "Restate metrics without inventing new ones",
+      "assistant": "The snapshot flags healthy profitability in the metrics provided and lists cash generation as a strength. Risks called out in the report include valuation and macro sensitivity. Numbers can be stale or wrong—verify with primary sources. This is for educational purposes only and is not financial advice."
+    },
+    {
+      "label": "Cautious tone when verdict is mixed",
+      "assistant": "The rule-based verdict suggests a mixed picture: margins in the metrics look reasonable, but leverage or growth concerns appear in the risk list. The snapshot is a starting point for learning, not a recommendation. This is for educational purposes only and is not financial advice."
+    }
+  ]
+}

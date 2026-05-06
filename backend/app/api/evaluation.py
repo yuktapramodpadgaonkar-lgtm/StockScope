@@ -7,9 +7,8 @@ and returns latency, citation count, and safety status for each.
 
 from __future__ import annotations
 
-import re
 import time
-from typing import Literal
+from typing import Any, Literal
 
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
@@ -17,18 +16,11 @@ from pydantic import BaseModel, Field
 from app.observability.jsonl_audit import log_model_call
 from services.ai.llm_service import LLMService
 from services.ai.prompts import build_multi_model_comparison_prompt
+from services.ai.response_metrics import build_response_metrics
 
 router = APIRouter(prefix="/api/evaluation", tags=["Evaluation"])
 
 _llm = LLMService()
-
-_ADVICE_RE = re.compile(
-    r"\b(should (?:you|i) (?:buy|sell|invest|hold)|"
-    r"(?:strong )?(?:buy|sell) recommendation|"
-    r"i (?:recommend|suggest) (?:buying|selling)|"
-    r"definitely (?:buy|sell))\b",
-    re.IGNORECASE,
-)
 
 _DISCLAIMER = "Educational use only. Not financial advice."
 
@@ -48,6 +40,7 @@ class ModelResult(BaseModel):
     citation_count: int
     safety_passed: bool
     error: str | None = None
+    metrics: dict[str, Any] | None = None
 
 
 class CompareResponse(BaseModel):
@@ -59,14 +52,6 @@ class CompareResponse(BaseModel):
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
-
-def _count_citations(text: str) -> int:
-    return len(re.findall(r"https?://\S+", text))
-
-
-def _safety_passed(text: str) -> bool:
-    return not bool(_ADVICE_RE.search(text))
-
 
 def _call_single_model(
     model_name: str,
@@ -101,13 +86,20 @@ def _call_single_model(
         latency_ms=latency_ms,
         error=error,
     )
+    metrics = build_response_metrics(
+        response,
+        reference_text=prompt,
+        task=eval_task,
+        latency_ms=latency_ms,
+    )
     return ModelResult(
         model=model_name,
         response=response,
         latency_ms=latency_ms,
-        citation_count=_count_citations(response),
-        safety_passed=_safety_passed(response),
+        citation_count=int(metrics.get("citation_count") or 0),
+        safety_passed=bool(metrics.get("safety", {}).get("passed")),
         error=error,
+        metrics=metrics,
     )
 
 

@@ -1,0 +1,24 @@
+{
+  "description": "Research assistant planner + writer (agentic RAG page).",
+  "variants": {
+    "plan": {
+      "shots": [
+        {
+          "label": "Multi-step plan with distinct tools",
+          "text": "Illustrative plan JSON only (tickers are placeholders):\n{\"steps\":[{\"tool\":\"fundamental\",\"args\":{\"ticker\":\"NVDA\"}},{\"tool\":\"news_sentiment\",\"args\":{\"ticker\":\"NVDA\",\"max_articles\":5}},{\"tool\":\"buy_sell\",\"args\":{\"ticker\":\"NVDA\",\"include_retrieval\":true}}]}"
+        }
+      ]
+    },
+    "writer": {
+      "shots": [
+        {
+          "label": "Answer cites evidence indices only",
+          "json_output": {
+            "answer": "Based only on the normalized evidence: summarize tensions between growth narrative and risks mentioned in items, without inventing filings or prices.",
+            "citations_used": [1, 2]
+          }
+        }
+      ]
+    }
+  }
+}

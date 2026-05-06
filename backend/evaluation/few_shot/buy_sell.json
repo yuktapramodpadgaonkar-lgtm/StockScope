@@ -1,0 +1,13 @@
+{
+  "description": "Plain-text narrative explaining a deterministic buy/sell score (no new recommendation).",
+  "shots": [
+    {
+      "label": "Explain a BUY score from listed signals only",
+      "text": "The model assigned AAPL a BUY with an overall score of 72/100 because fundamentals and technicals scored relatively high while sentiment was more mixed. The listed signals point to solid cash generation and constructive price momentum, offset partly by valuation pressure mentioned in the signals. This is for educational purposes only and is not financial advice."
+    },
+    {
+      "label": "Explain a HOLD score with mixed dimensions",
+      "text": "The model rated XOM as HOLD (58/100) because the rule-based scores are split: fundamentals and sentiment do not strongly align, and the signals highlight macro-driven volatility and mixed read-through from the data provided. The output reflects the scoring template, not a personal recommendation. This is for educational purposes only and is not financial advice."
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "description": "Planner JSON and writer JSON for agentic chat.",
+  "variants": {
+    "plan": {
+      "shots": [
+        {
+          "label": "Two-tool plan for a ticker question",
+          "text": "Good planner output shape:\n{\"steps\":[{\"tool\":\"fundamental\",\"args\":{\"ticker\":\"MSFT\"}},{\"tool\":\"news_sentiment\",\"args\":{\"ticker\":\"MSFT\",\"max_articles\":5}}]}"
+        }
+      ]
+    },
+    "writer": {
+      "shots": [
+        {
+          "label": "Writer obeys evidence + citations_used",
+          "json_output": {
+            "answer": "From the evidence items, fundamentals look mixed and news themes are summarized only as provided—no extra headlines invented.",
+            "bullets": [
+              "Cite only supplied evidence.",
+              "If a claim is unsupported, soften or drop it.",
+              "Educational framing only."
+            ],
+            "citations_used": [1]
+          }
+        }
+      ]
+    }
+  }
+}

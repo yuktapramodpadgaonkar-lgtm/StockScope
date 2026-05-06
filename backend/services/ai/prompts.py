@@ -23,11 +23,19 @@ IMPORTANT INSTRUCTIONS:
 - If citations (URLs) are provided, include them in your response.
 """
 
+
+def _few_shots(feature: str, variant: str | None = None) -> str:
+    from services.ai.few_shot_loader import few_shot_examples_block
+
+    block = few_shot_examples_block(feature, variant=variant)
+    return f"\n{block}\n" if block else ""
+
+
 # ── News Sentiment ─────────────────────────────────────────────────────────────
 
 NEWS_THEMES_PROMPT = """\
 {safety}
-
+{few_shot_examples}
 You are a financial analyst reviewing recent news for the stock ticker: {ticker}.
 
 Identify the 3 most important recurring themes from the headlines below.
@@ -45,11 +53,35 @@ Headlines (with sentiment label):
 {headlines}
 """
 
+NEWS_THEMES_REPAIR_PROMPT = """\
+{safety}
+
+Your previous JSON output had quality issues.
+
+Ticker: {ticker}
+
+Available citations (URLs): {has_citations}
+Problem: {problem}
+
+Headlines provided (with sentiment label):
+{headlines}
+
+Previous JSON output (fix issues; do not invent headlines):
+{previous}
+
+Instructions:
+- If there are no citations (URLs), do NOT claim \"reported\", \"headlines\", or \"articles say\" specific items.
+- In that case, write a cautious summary that explicitly says evidence is insufficient.
+- Always end summary with: \"This is for educational purposes only.\"
+- Return ONLY valid JSON:
+{{\"themes\": [\"...\", \"...\", \"...\"], \"summary\": \"...\"}}
+"""
+
 # ── Chatbot: stock movement explanation ───────────────────────────────────────
 
 STOCK_EXPLANATION_PROMPT = """\
 {safety}
-
+{few_shot_examples}
 You are an educational stock market analyst.
 
 User question: "{query}"
@@ -75,7 +107,7 @@ Return ONLY valid JSON — no markdown fences, no extra text:
 
 SENTIMENT_QUESTION_PROMPT = """\
 {safety}
-
+{few_shot_examples}
 You are an educational market analyst.
 
 User question: "{query}"
@@ -99,7 +131,7 @@ Return ONLY valid JSON — no markdown fences, no extra text:
 
 COMPARISON_PROMPT = """\
 {safety}
-
+{few_shot_examples}
 You are an educational market analyst.
 
 User question: "{query}"
@@ -120,7 +152,7 @@ Return ONLY valid JSON — no markdown fences, no extra text:
 
 GENERAL_FINANCE_PROMPT = """\
 {safety}
-
+{few_shot_examples}
 You are an educational financial analyst assistant.
 
 User question: "{query}"
@@ -139,8 +171,27 @@ Return ONLY valid JSON — no markdown fences, no extra text:
 def build_news_themes_prompt(ticker: str, headlines: str) -> str:
     return NEWS_THEMES_PROMPT.format(
         safety=SAFETY_BLOCK,
+        few_shot_examples=_few_shots("news_themes"),
         ticker=ticker.upper(),
         headlines=headlines,
+    )
+
+
+def build_news_themes_repair_prompt(
+    *,
+    ticker: str,
+    headlines: str,
+    previous: str,
+    problem: str,
+    has_citations: bool,
+) -> str:
+    return NEWS_THEMES_REPAIR_PROMPT.format(
+        safety=SAFETY_BLOCK,
+        ticker=ticker.upper(),
+        headlines=headlines,
+        previous=(previous or "")[:1500],
+        problem=(problem or "")[:200],
+        has_citations=str(bool(has_citations)).lower(),
     )
 
 
@@ -155,6 +206,7 @@ def build_stock_explanation_prompt(
 ) -> str:
     return STOCK_EXPLANATION_PROMPT.format(
         safety=SAFETY_BLOCK,
+        few_shot_examples=_few_shots("chat"),
         query=query,
         ticker=ticker,
         news_context=news_context,
@@ -177,6 +229,7 @@ def build_sentiment_question_prompt(
 ) -> str:
     return SENTIMENT_QUESTION_PROMPT.format(
         safety=SAFETY_BLOCK,
+        few_shot_examples=_few_shots("chat"),
         query=query,
         ticker=ticker,
         positive=positive,
@@ -191,6 +244,7 @@ def build_sentiment_question_prompt(
 def build_comparison_prompt(query: str, tickers: str) -> str:
     return COMPARISON_PROMPT.format(
         safety=SAFETY_BLOCK,
+        few_shot_examples=_few_shots("chat"),
         query=query,
         tickers=tickers,
     )
@@ -199,7 +253,145 @@ def build_comparison_prompt(query: str, tickers: str) -> str:
 def build_general_finance_prompt(query: str) -> str:
     return GENERAL_FINANCE_PROMPT.format(
         safety=SAFETY_BLOCK,
+        few_shot_examples=_few_shots("chat"),
         query=query,
+    )
+
+
+# ── Agentic Chat (planner → tools → writer → critic) ───────────────────────────
+
+AGENTIC_CHAT_PLAN_PROMPT = """\
+{safety}
+{few_shot_examples}
+You are a planning agent for an educational stock chatbot.
+
+User question: "{query}"
+Tickers detected from the user text: {tickers_detected}
+
+You MUST output ONLY valid JSON (no markdown, no extra text).
+
+Allowed tools (use ONLY these): {allowed_tools}
+
+Rules:
+- Output format: {{"steps":[{{"tool":"<name>","args":{{...}}}}, ...]}}
+- Prefer 2 steps for ticker questions: fundamental + news_sentiment.
+- Use history only if the user asks about history or prior chats.
+- Avoid unnecessary steps (keep it short).
+- Do not include secrets.
+
+Tool arg hints:
+- fundamental: {{"ticker":"AAPL"}}
+- news_sentiment: {{"ticker":"AAPL","max_articles":5}}
+- buy_sell: {{"ticker":"AAPL","include_retrieval":true}}
+- history: {{}}
+
+{planner_retry_hint}
+"""
+
+
+AGENTIC_CHAT_WRITER_PROMPT = """\
+{safety}
+{few_shot_examples}
+You are an educational stock chatbot. Answer the user's question using ONLY the evidence below.
+
+User question: "{query}"
+
+Normalized evidence items (JSON). Each item has: source_id, tool, ticker, title, text, url, timestamp, numeric_facts, metadata.
+{evidence_json}
+
+Citations list (1-indexed, JSON):
+{citations_json}
+
+Instructions:
+- Use ONLY the normalized evidence items; do not invent facts.
+- If evidence is insufficient, say so explicitly and keep it high-level.
+- Do NOT give direct buy/sell instructions.
+- Return ONLY valid JSON (no markdown):
+  {{"answer":"...", "bullets":["...","...","..."], "citations_used":[1,2]}}
+- bullets must be 3–5 short items.
+- citations_used must be indices into the provided citations list (1-indexed). If you do not use citations, return [].
+"""
+
+
+AGENTIC_CHAT_REPAIR_PROMPT = """\
+{safety}
+
+Your previous answer failed automated checks. Produce a REVISED answer using ONLY the evidence below.
+
+User question: "{query}"
+
+Failed checks: {failed_checks}
+Reviewer notes: {critic_notes}
+
+Previous answer:
+{previous_answer}
+
+Normalized evidence items (JSON):
+{evidence_json}
+
+Citations list (1-indexed, JSON):
+{citations_json}
+
+Return ONLY valid JSON:
+  {{"answer":"...", "bullets":["...","...","..."], "citations_used":[1]}}
+"""
+
+
+def build_agentic_chat_plan_prompt(
+    *,
+    query: str,
+    tickers_detected: list[str],
+    allowed_tools: list[str],
+    planner_retry_hint: str = "",
+) -> str:
+    hint = (planner_retry_hint or "").strip()
+    hint_block = f"CRITICAL — planner correction (you must follow this):\n{hint}\n" if hint else ""
+    return AGENTIC_CHAT_PLAN_PROMPT.format(
+        safety=SAFETY_BLOCK,
+        few_shot_examples=_few_shots("agentic_chat", variant="plan"),
+        query=query.strip(),
+        tickers_detected=", ".join(tickers_detected) if tickers_detected else "(none)",
+        allowed_tools=", ".join(allowed_tools),
+        planner_retry_hint=hint_block,
+    )
+
+
+def build_agentic_chat_writer_prompt(
+    *,
+    query: str,
+    evidence: list[dict],
+    citations: list[dict],
+) -> str:
+    import json
+
+    return AGENTIC_CHAT_WRITER_PROMPT.format(
+        safety=SAFETY_BLOCK,
+        few_shot_examples=_few_shots("agentic_chat", variant="writer"),
+        query=query.strip(),
+        evidence_json=json.dumps(evidence, ensure_ascii=False)[:12000],
+        citations_json=json.dumps(citations, ensure_ascii=False)[:12000],
+    )
+
+
+def build_agentic_chat_repair_prompt(
+    *,
+    query: str,
+    evidence: list[dict],
+    citations: list[dict],
+    previous_answer: str,
+    failed_checks: list[str],
+    critic_notes: list[str],
+) -> str:
+    import json
+
+    return AGENTIC_CHAT_REPAIR_PROMPT.format(
+        safety=SAFETY_BLOCK,
+        query=query.strip(),
+        failed_checks=json.dumps(failed_checks, ensure_ascii=False),
+        critic_notes=json.dumps(critic_notes, ensure_ascii=False),
+        previous_answer=(previous_answer or "")[:2000],
+        evidence_json=json.dumps(evidence, ensure_ascii=False)[:12000],
+        citations_json=json.dumps(citations, ensure_ascii=False)[:12000],
     )
 
 
@@ -207,7 +399,7 @@ def build_general_finance_prompt(query: str) -> str:
 
 BUY_SELL_EXPLANATION_PROMPT = """\
 {safety}
-
+{few_shot_examples}
 You are an educational financial analyst explaining a deterministic scoring model's output.
 
 Ticker: {ticker}
@@ -244,6 +436,7 @@ def build_buy_sell_explanation_prompt(
     signals_text = "\n".join(f"- {s}" for s in signals) if signals else "- No specific signals available."
     return BUY_SELL_EXPLANATION_PROMPT.format(
         safety=SAFETY_BLOCK,
+        few_shot_examples=_few_shots("buy_sell"),
         ticker=ticker.upper(),
         recommendation=recommendation,
         overall_score=overall_score,
@@ -258,7 +451,7 @@ def build_buy_sell_explanation_prompt(
 
 FUNDAMENTAL_EXPLANATION_PROMPT = """\
 {safety}
-
+{few_shot_examples}
 You are an educational financial analyst explaining a rule-based fundamental analysis.
 
 Ticker: {ticker}
@@ -298,6 +491,7 @@ def build_fundamental_explanation_prompt(
     risks_text = "\n".join(f"- {r}" for r in risks) if risks else "- None flagged."
     return FUNDAMENTAL_EXPLANATION_PROMPT.format(
         safety=SAFETY_BLOCK,
+        few_shot_examples=_few_shots("fundamental"),
         ticker=ticker.upper(),
         verdict=verdict,
         metrics_text=metrics_text,
@@ -310,7 +504,7 @@ def build_fundamental_explanation_prompt(
 
 MULTI_MODEL_TASK_PROMPT = """\
 {safety}
-
+{few_shot_examples}
 You are an educational financial analyst. Task: {task_label}
 
 Ticker: {ticker}
@@ -340,6 +534,7 @@ def build_multi_model_comparison_prompt(task: str, ticker: str, query: str) -> s
     hint = _TASK_HINTS.get(task, "general financial analysis")
     return MULTI_MODEL_TASK_PROMPT.format(
         safety=SAFETY_BLOCK,
+        few_shot_examples=_few_shots("multi_model"),
         task_label=task.replace("_", " ").title(),
         ticker=ticker.upper(),
         query=query,
@@ -351,7 +546,7 @@ def build_multi_model_comparison_prompt(task: str, ticker: str, query: str) -> s
 
 AGENTIC_PLAN_PROMPT = """\
 {safety}
-
+{few_shot_examples}
 You are a planning agent for an educational stock research assistant.
 
 Ticker: {ticker}
@@ -397,6 +592,7 @@ def build_agentic_plan_prompt(
     hint_block = f"CRITICAL — planner correction (you must follow this):\n{hint}\n" if hint else ""
     return AGENTIC_PLAN_PROMPT.format(
         safety=SAFETY_BLOCK,
+        few_shot_examples=_few_shots("agentic_rag", variant="plan"),
         ticker=ticker.upper(),
         question=question.strip(),
         memory_context=(memory_context or "{}")[:4000],
@@ -409,7 +605,7 @@ def build_agentic_plan_prompt(
 
 AGENTIC_WRITER_PROMPT = """\
 {safety}
-
+{few_shot_examples}
 You are an educational stock research assistant. Answer the user's question using ONLY the evidence below.
 
 Ticker: {ticker}
@@ -446,6 +642,7 @@ def build_agentic_writer_prompt(
 
     return AGENTIC_WRITER_PROMPT.format(
         safety=SAFETY_BLOCK,
+        few_shot_examples=_few_shots("agentic_rag", variant="writer"),
         ticker=ticker.upper(),
         question=question.strip(),
         memory_context=(memory_context or "{}")[:4000],
