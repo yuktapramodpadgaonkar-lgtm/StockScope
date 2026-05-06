@@ -333,7 +333,17 @@
         "preferred_horizon": { "type": ["string", "null"] },
         "analysis_style": { "type": ["string", "null"] },
         "session_summary": { "type": "string" },
-        "follow_up_context": { "type": "string" }
+        "follow_up_context": { "type": "string" },
+        "memory_profile": {
+          "type": "object",
+          "description": "Long-horizon summary: frequent_tickers, preferred_topics, risk_style",
+          "additionalProperties": true,
+          "properties": {
+            "frequent_tickers": { "type": "array", "items": { "type": "string" } },
+            "preferred_topics": { "type": "array", "items": { "type": "string" } },
+            "risk_style": { "type": "string" }
+          }
+        }
       }
     },
     "buy_sell_agent_pipeline": {

@@ -49,6 +49,129 @@ def _write_all(data: dict[str, Any]) -> None:
     tmp.replace(_STORE_PATH)
 
 
+def _default_memory_profile() -> dict[str, Any]:
+    """Long-horizon summary JSON — derived from session activity, surfaced to agentic RAG."""
+    return {
+        "frequent_tickers": [],
+        "preferred_topics": ["fundamentals", "news"],
+        "risk_style": "balanced",
+    }
+
+
+def _analysis_style_to_risk_style(style: str) -> str:
+    s = (style or "balanced").strip().lower()
+    if s == "growth":
+        return "moderate"
+    if s in ("income", "value"):
+        return "cautious"
+    return "balanced"
+
+
+def recompute_memory_profile(sess: dict[str, Any]) -> dict[str, Any]:
+    """Refresh memory_profile from recent_tickers, session_summary, and analysis_style."""
+    mp = dict(sess.get("memory_profile") or _default_memory_profile())
+    recent = [str(x).upper() for x in (sess.get("recent_tickers") or []) if x]
+    mp["frequent_tickers"] = recent[:10]
+
+    topics: set[str] = set(mp.get("preferred_topics") or []) if isinstance(mp.get("preferred_topics"), list) else set()
+    summ = (sess.get("session_summary") or "").lower()
+    for key, label in (
+        ("news", "news"),
+        ("sentiment", "news"),
+        ("headline", "news"),
+        ("fundamental", "fundamentals"),
+        ("valuation", "fundamentals"),
+        ("earnings", "fundamentals"),
+        ("technical", "technicals"),
+        ("chart", "technicals"),
+    ):
+        if key in summ:
+            topics.add(label)
+    if not topics:
+        topics = {"fundamentals", "news"}
+    mp["preferred_topics"] = sorted(topics)
+
+    mp["risk_style"] = _analysis_style_to_risk_style(str(sess.get("analysis_style") or "balanced"))
+    sess["memory_profile"] = mp
+    return mp
+
+
+def memory_profile_for_prompt(sess: dict[str, Any]) -> str:
+    """Compact JSON string for planner/writer context."""
+    mp = sess.get("memory_profile") or recompute_memory_profile(sess)
+    try:
+        return json.dumps(mp, ensure_ascii=True)
+    except (TypeError, ValueError):
+        return "{}"
+
+
+def apply_eval_memory_seed(session_id: str, seed: dict[str, Any]) -> dict[str, Any]:
+    """Merge seed into session for batch eval (frequent_tickers, memory_profile fields)."""
+    if not settings.memory_enabled:
+        return _default_session_payload(_sanitize_session_id(session_id))
+    sid = _sanitize_session_id(session_id)
+    data = _read_all()
+    sess = data["sessions"].get(sid) or _default_session_payload(sid)
+    if freq := seed.get("frequent_tickers"):
+        if isinstance(freq, list):
+            sess["recent_tickers"] = [str(x).upper() for x in freq if x][:30]
+    if isinstance(seed.get("memory_profile"), dict):
+        base = dict(sess.get("memory_profile") or _default_memory_profile())
+        base.update(seed["memory_profile"])
+        sess["memory_profile"] = base
+    if seed.get("session_summary") is not None:
+        sess["session_summary"] = str(seed["session_summary"])[:4000]
+    if seed.get("analysis_style") is not None:
+        s = str(seed["analysis_style"]).strip().lower()
+        if s in ("balanced", "growth", "income", "value"):
+            sess["analysis_style"] = s
+    recompute_memory_profile(sess)
+    if isinstance(seed.get("memory_profile"), dict):
+        mp = dict(sess["memory_profile"])
+        for k, v in seed["memory_profile"].items():
+            if v is not None:
+                mp[k] = v
+        sess["memory_profile"] = mp
+    sess["updated_at"] = datetime.now(timezone.utc).isoformat()
+    data["sessions"][sid] = sess
+    _write_all(data)
+    return sess
+
+
+def touch_agentic_session(session_id: str, ticker: str, question: str) -> dict[str, Any]:
+    """After an agentic run: bump recent tickers and topic hints from the question."""
+    if not settings.memory_enabled:
+        return _default_session_payload(_sanitize_session_id(session_id))
+    record_ticker_analysis(session_id, ticker)
+    sid = _sanitize_session_id(session_id)
+    data = _read_all()
+    sess = data["sessions"].get(sid) or _default_session_payload(sid)
+    merge_topics_from_question(sess, question)
+    recompute_memory_profile(sess)
+    sess["updated_at"] = datetime.now(timezone.utc).isoformat()
+    data["sessions"][sid] = sess
+    _write_all(data)
+    return sess
+
+
+def merge_topics_from_question(sess: dict[str, Any], question: str) -> None:
+    q = (question or "").lower()
+    mp = dict(sess.get("memory_profile") or _default_memory_profile())
+    topics = set(mp.get("preferred_topics") or []) if isinstance(mp.get("preferred_topics"), list) else set()
+    if not topics:
+        topics = {"fundamentals", "news"}
+    if any(x in q for x in ("news", "headline", "sentiment", "article")):
+        topics.add("news")
+    if any(x in q for x in ("fundamental", "pe ratio", "valuation", "earnings", "margin")):
+        topics.add("fundamentals")
+    if any(x in q for x in ("technical", "chart", "momentum", "moving average")):
+        topics.add("technicals")
+    if any(x in q for x in ("compare", "versus", " vs ")):
+        topics.add("comparison")
+    mp["preferred_topics"] = sorted(topics)
+    sess["memory_profile"] = mp
+
+
 def _default_session_payload(session_id: str) -> dict[str, Any]:
     now = datetime.now(timezone.utc).isoformat()
     return {
@@ -57,6 +180,7 @@ def _default_session_payload(session_id: str) -> dict[str, Any]:
         "preferred_horizon": None,
         "analysis_style": "balanced",
         "session_summary": "",
+        "memory_profile": _default_memory_profile(),
         "updated_at": now,
     }
 
@@ -76,6 +200,14 @@ def load_session(session_id: str) -> dict[str, Any]:
     sess.setdefault("session_summary", "")
     sess.setdefault("preferred_horizon", None)
     sess.setdefault("updated_at", datetime.now(timezone.utc).isoformat())
+    migrated = False
+    if "memory_profile" not in sess or not isinstance(sess.get("memory_profile"), dict):
+        sess["memory_profile"] = _default_memory_profile()
+        recompute_memory_profile(sess)
+        migrated = True
+    if migrated:
+        data["sessions"][sid] = sess
+        _write_all(data)
     return sess
 
 
@@ -100,6 +232,8 @@ def update_session_preferences(
             sess["analysis_style"] = s
     if session_summary is not None:
         sess["session_summary"] = session_summary.strip()[:4000]
+    sess.setdefault("memory_profile", _default_memory_profile())
+    recompute_memory_profile(sess)
     sess["updated_at"] = datetime.now(timezone.utc).isoformat()
     data["sessions"][sid] = sess
     _write_all(data)
@@ -120,6 +254,8 @@ def record_ticker_analysis(session_id: str, ticker: str) -> dict[str, Any]:
     sess["recent_tickers"] = recent[:cap]
     if not (str(sess.get("session_summary") or "").strip()):
         sess["session_summary"] = _auto_summary(sess["recent_tickers"], "")
+    sess.setdefault("memory_profile", _default_memory_profile())
+    recompute_memory_profile(sess)
     sess["updated_at"] = datetime.now(timezone.utc).isoformat()
     data["sessions"][sid] = sess
     _write_all(data)
@@ -141,6 +277,7 @@ def reset_session(session_id: str) -> dict[str, Any]:
     sid = _sanitize_session_id(session_id)
     data = _read_all()
     fresh = _default_session_payload(sid)
+    recompute_memory_profile(fresh)
     data["sessions"][sid] = fresh
     _write_all(data)
     return fresh
@@ -168,6 +305,9 @@ def build_follow_up_context(session: dict[str, Any], current_ticker: str | None 
 
 def memory_block_after_analyze(session_id: str, ticker: str) -> MemoryBlock:
     sess = load_session(session_id)
+    mp = sess.get("memory_profile")
+    if not isinstance(mp, dict):
+        mp = {}
     return MemoryBlock(
         session_id=str(sess.get("session_id") or session_id),
         recent_tickers=[str(x).upper() for x in (sess.get("recent_tickers") or []) if x],
@@ -175,4 +315,5 @@ def memory_block_after_analyze(session_id: str, ticker: str) -> MemoryBlock:
         analysis_style=str(sess.get("analysis_style") or "balanced"),
         session_summary=str(sess.get("session_summary") or ""),
         follow_up_context=build_follow_up_context(sess, ticker),
+        memory_profile=dict(mp),
     )

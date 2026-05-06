@@ -9,6 +9,7 @@ from app.rag.embedding_index import sync_embeddings_for_ticker
 from app.rag.store import load_chunks
 from app.schemas.buy_sell_analysis import BuySellReport, PipelineStepTrace
 from app.services.buy_sell_scoring import build_buy_sell_report_from_layer1
+from app.observability.jsonl_audit import log_tool_call
 from app.tools import get_layer1_for_llm
 
 
@@ -29,22 +30,43 @@ def _run_step(
     try:
         out = fn()
         ms = (time.perf_counter() - t0) * 1000.0
-        return out, PipelineStepTrace(
+        trace = PipelineStepTrace(
             step_id=step_id,
             description=description,
             status="ok",
             duration_ms=round(ms, 2),
             detail=None,
         )
+        out_sum = type(out).__name__
+        if isinstance(out, dict):
+            out_sum = f"dict(keys={list(out.keys())[:8]})"
+        elif isinstance(out, list):
+            out_sum = f"list(len={len(out)})"
+        log_tool_call(
+            tool_name=step_id,
+            input_summary=description,
+            output_summary=out_sum,
+            latency_ms=trace.duration_ms,
+            error=None,
+        )
+        return out, trace
     except Exception as e:
         ms = (time.perf_counter() - t0) * 1000.0
-        return None, PipelineStepTrace(
+        trace = PipelineStepTrace(
             step_id=step_id,
             description=description,
             status="error",
             duration_ms=round(ms, 2),
             detail=str(e)[:500],
         )
+        log_tool_call(
+            tool_name=step_id,
+            input_summary=description,
+            output_summary="error",
+            latency_ms=trace.duration_ms,
+            error=trace.detail,
+        )
+        return None, trace
 
 
 def execute_buy_sell_pipeline(

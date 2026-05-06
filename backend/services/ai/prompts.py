@@ -345,3 +345,172 @@ def build_multi_model_comparison_prompt(task: str, ticker: str, query: str) -> s
         query=query,
         task_hint=hint,
     )
+
+
+# ── Agentic RAG (planner + writer) ─────────────────────────────────────────────
+
+AGENTIC_PLAN_PROMPT = """\
+{safety}
+
+You are a planning agent for an educational stock research assistant.
+
+Ticker: {ticker}
+User question: "{question}"
+
+Long-horizon memory summary for this session (JSON; use for context only, not as a fact source):
+{memory_context}
+
+You MUST output ONLY valid JSON (no markdown, no extra text).
+
+Allowed tools (use ONLY these): {allowed_tools}
+
+Rules:
+- Produce a plan with 2 to {max_steps} steps total (steps array).
+- If require_two_tools=true: use AT LEAST TWO DIFFERENT non-history tools.
+- Each step is an object: {{"tool": "<name>", "args": {{...}}}}
+- Use small args. Do not include any secrets.
+
+Args schema hints:
+- fundamental: {{"ticker":"{ticker}"}}
+- news_sentiment: {{"ticker":"{ticker}", "max_articles": 5}}
+- buy_sell: {{"ticker":"{ticker}", "include_retrieval": true, "horizon": "6mo"}}
+- history: {{"session_id":"default"}}
+
+Output JSON format:
+{{"steps":[{{"tool":"fundamental","args":{{"ticker":"{ticker}"}}}}]}}
+
+{planner_retry_hint}
+"""
+
+
+def build_agentic_plan_prompt(
+    *,
+    ticker: str,
+    question: str,
+    allowed_tools: list[str],
+    max_steps: int,
+    require_two_tools: bool,
+    memory_context: str = "{}",
+    planner_retry_hint: str = "",
+) -> str:
+    hint = (planner_retry_hint or "").strip()
+    hint_block = f"CRITICAL — planner correction (you must follow this):\n{hint}\n" if hint else ""
+    return AGENTIC_PLAN_PROMPT.format(
+        safety=SAFETY_BLOCK,
+        ticker=ticker.upper(),
+        question=question.strip(),
+        memory_context=(memory_context or "{}")[:4000],
+        allowed_tools=", ".join(allowed_tools),
+        max_steps=max_steps,
+        require_two_tools=str(bool(require_two_tools)).lower(),
+        planner_retry_hint=hint_block,
+    )
+
+
+AGENTIC_WRITER_PROMPT = """\
+{safety}
+
+You are an educational stock research assistant. Answer the user's question using ONLY the evidence below.
+
+Ticker: {ticker}
+Question: "{question}"
+
+Session memory summary (JSON; preferences only — do not treat as market facts):
+{memory_context}
+
+Normalized evidence items (JSON). Each item has: source_id, tool, ticker, title, text, url, timestamp, numeric_facts, metadata.
+{evidence_json}
+
+Citations list (1-indexed, JSON):
+{citations_json}
+
+Instructions:
+- Use ONLY the normalized evidence items; do not invent facts.
+- If evidence is insufficient, say so explicitly.
+- Include a short disclaimer at the end (not financial advice).
+- Return ONLY valid JSON (no markdown, no extra text):
+  {{"answer":"...", "citations_used":[1,2]}}
+- citations_used must be indices into the provided citations list.
+"""
+
+
+def build_agentic_writer_prompt(
+    *,
+    ticker: str,
+    question: str,
+    evidence: list[dict],
+    citations: list[dict],
+    memory_context: str = "{}",
+) -> str:
+    import json  # local import to keep prompts module lightweight
+
+    return AGENTIC_WRITER_PROMPT.format(
+        safety=SAFETY_BLOCK,
+        ticker=ticker.upper(),
+        question=question.strip(),
+        memory_context=(memory_context or "{}")[:4000],
+        evidence_json=json.dumps(evidence, ensure_ascii=False)[:12000],
+        citations_json=json.dumps(citations, ensure_ascii=False)[:12000],
+    )
+
+
+AGENTIC_REPAIR_PROMPT = """\
+{safety}
+
+Your previous answer failed automated quality checks. Produce a REVISED answer using ONLY the evidence below.
+
+Ticker: {ticker}
+Question: "{question}"
+
+Session memory summary (JSON; preferences only):
+{memory_context}
+
+Failed checks (machine codes): {failed_checks}
+Reviewer notes: {critic_notes}
+
+Previous answer (fix problems; do not repeat unsupported claims):
+---
+{previous_answer}
+---
+
+Normalized evidence items (JSON):
+{evidence_json}
+
+Citations list (1-indexed, JSON):
+{citations_json}
+
+Instructions:
+- Remove or rephrase content that violates the failed checks.
+- If you cited news/filings, include at least one valid citations_used index.
+- Do not introduce tickers or numbers not supported by evidence.
+- No direct buy/sell instructions; educational framing only.
+- If checks cannot be fixed without new data (e.g. plan/tooling issue), say evidence is insufficient.
+- Return ONLY valid JSON (no markdown):
+  {{"answer":"...", "citations_used":[1]}}
+"""
+
+
+def build_agentic_repair_prompt(
+    *,
+    ticker: str,
+    question: str,
+    evidence: list[dict],
+    citations: list[dict],
+    previous_answer: str,
+    failed_checks: list[str],
+    critic_notes: list[str],
+    memory_context: str = "{}",
+) -> str:
+    import json
+
+    return AGENTIC_REPAIR_PROMPT.format(
+        safety=SAFETY_BLOCK,
+        ticker=ticker.upper(),
+        question=question.strip(),
+        memory_context=(memory_context or "{}")[:4000],
+        failed_checks=json.dumps(failed_checks, ensure_ascii=False),
+        critic_notes=json.dumps(critic_notes, ensure_ascii=False),
+        previous_answer=(previous_answer or "")[:8000],
+        evidence_json=json.dumps(evidence, ensure_ascii=False)[:12000],
+        citations_json=json.dumps(citations, ensure_ascii=False)[:12000],
+    )
