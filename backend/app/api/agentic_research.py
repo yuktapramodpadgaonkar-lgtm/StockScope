@@ -297,6 +297,39 @@ def _planner_example_json(*, ticker: str, non_history: list[str]) -> str:
     )
 
 
+def _ingest_articles_to_rag(ticker: str, articles: list[dict]) -> int:
+    """Convert news articles fetched by the news_sentiment tool into RAG chunks."""
+    from app.rag.store import upsert_chunks  # local import — keep rag optional
+    import hashlib
+    from datetime import datetime, timezone as _tz
+
+    rows: list[dict] = []
+    ingested_at = datetime.now(_tz.utc).isoformat()
+    for idx, art in enumerate(articles[:30]):
+        headline = str(art.get("headline") or art.get("title") or "").strip()
+        summary = str(art.get("summary") or "").strip()
+        text = " ".join(x for x in [headline, summary] if x).strip()
+        if not text:
+            continue
+        url = str(art.get("url") or "")
+        published = str(art.get("published_at") or "")
+        uid = f"{ticker}:news:{idx}:{abs(hash((headline, published))) % 10_000_000}"
+        rows.append({
+            "chunk_id": uid,
+            "ticker": ticker,
+            "doc_type": "news",
+            "title": headline or None,
+            "text": text[:2200],
+            "url": url or None,
+            "published_at": published or None,
+            "ingested_at": ingested_at,
+            "source": str(art.get("source") or "news"),
+        })
+    if not rows:
+        return 0
+    return upsert_chunks(rows)
+
+
 def _run_tool(step: PlanStep, *, ticker: str, session_id: str) -> tuple[dict[str, Any], list[CitationItem], float]:
     tool = step.tool
     args = step.args or {}
@@ -330,6 +363,11 @@ def _run_tool(step: PlanStep, *, ticker: str, session_id: str) -> tuple[dict[str
                 for c in (out["report"].get("citations") or [])
                 if (c.get("url") or "").strip()
             ]
+            # Side-effect: ingest fetched articles into RAG for grounded retrieval
+            try:
+                _ingest_articles_to_rag(ticker, out["report"].get("articles") or [])
+            except Exception:  # noqa: BLE001
+                pass  # RAG ingestion failure must not break the pipeline
         elif tool == "buy_sell":
             include_retrieval = bool(args.get("include_retrieval", True))
             rep = run_buy_sell_with_agents(
@@ -635,4 +673,30 @@ def run_agentic_research(body: AgenticResearchRequest) -> AgenticResearchRespons
         provider=provider,
         latency_ms=round(total_ms, 2),
     )
+
+
+# ── Standalone ingest endpoint ────────────────────────────────────────────────
+
+class IngestResponse(BaseModel):
+    ticker: str
+    ingested: int
+    error: str | None = None
+
+
+@router.post("/ingest", response_model=IngestResponse)
+def ingest_ticker(ticker: str) -> IngestResponse:
+    """
+    Fetch latest news for a ticker and store it in the RAG knowledge base.
+    Call this before running agentic research on a new ticker for best results.
+    """
+    sym = ticker.strip().upper()
+    if not sym:
+        raise HTTPException(status_code=400, detail="ticker query param is required")
+    try:
+        ns = build_news_sentiment_report(sym, None, None, max_articles=20, model_name=None)
+        articles = [a.model_dump(mode="json") for a in (ns.articles or [])]
+        ingested = _ingest_articles_to_rag(sym, articles)
+        return IngestResponse(ticker=sym, ingested=ingested)
+    except Exception as exc:  # noqa: BLE001
+        return IngestResponse(ticker=sym, ingested=0, error=str(exc)[:300])
 

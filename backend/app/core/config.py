@@ -20,8 +20,8 @@ class Settings(BaseSettings):
     # Optional — advanced valuation / transcripts later (Layer 1 MVP does not call FMP).
     fmp_api_key: str = ""
     # Buy/Sell LLM review (Phase 4)
-    buysell_llm_provider: str = "none"  # none | huggingface
-    buysell_llm_enabled: bool = False
+    buysell_llm_provider: str = "gemini"  # gemini | ollama | huggingface | none
+    buysell_llm_enabled: bool = True
     buysell_llm_model: str = ""  # e.g. FinGPT model id on Hugging Face
     buysell_llm_timeout_seconds: int = 45
     huggingface_api_token: str = ""
@@ -79,6 +79,10 @@ class Settings(BaseSettings):
 
     finbert_enabled: bool = True
     finbert_model_id: str = "ProsusAI/finbert"
+
+    # JWT authentication
+    jwt_secret_key: str = "changeme-dev-secret-minimum-32-chars!!"
+    jwt_expire_hours: int = 24
 
     model_config = SettingsConfigDict(
         env_file=str(_BACKEND_DIR / ".env"),

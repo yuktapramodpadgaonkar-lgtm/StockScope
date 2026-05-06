@@ -1,7 +1,13 @@
-"""History service with lightweight JSON persistence for Week 1."""
+"""History service with lightweight JSON persistence.
+
+Per-user isolation: when an email is provided, history is stored in a
+user-specific file (data/history_<md5>.json).  When no email is given the
+global history_store.json is used so unauthenticated calls keep working.
+"""
 
 from __future__ import annotations
 
+import hashlib
 import json
 import uuid
 from datetime import datetime, timezone
@@ -20,13 +26,22 @@ from app.schemas.history import (
     ThreadMessage,
 )
 
-_STORE_PATH = Path(__file__).resolve().parents[1] / "data" / "history_store.json"
+_DATA_DIR = Path(__file__).resolve().parents[1] / "data"
+_GLOBAL_STORE = _DATA_DIR / "history_store.json"
 
 M = TypeVar("M", bound=BaseModel)
 
 
+# ── Path helpers ──────────────────────────────────────────────────────────────
+
+def _store_path(email: str | None = None) -> Path:
+    if email:
+        h = hashlib.md5(email.strip().lower().encode()).hexdigest()[:16]
+        return _DATA_DIR / f"history_{h}.json"
+    return _GLOBAL_STORE
+
+
 def _validated_rows(raw: list[Any], model: Type[M]) -> list[M]:
-    """Skip invalid rows so one bad JSON entry cannot 500 the whole /api/history response."""
     out: list[M] = []
     for row in raw:
         if not isinstance(row, dict):
@@ -85,30 +100,40 @@ def _default_store() -> dict[str, Any]:
     }
 
 
-def _ensure_store() -> None:
-    _STORE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    if _STORE_PATH.exists():
+def _ensure_store(path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.exists():
         return
-    _STORE_PATH.write_text(json.dumps(_default_store(), indent=2), encoding="utf-8")
+    # New user files start empty; only the global file gets demo data
+    if path == _GLOBAL_STORE:
+        path.write_text(json.dumps(_default_store(), indent=2), encoding="utf-8")
+    else:
+        path.write_text(
+            json.dumps({"chat_history": [], "research_history": [], "saved_prompts": [], "threads": {}}, indent=2),
+            encoding="utf-8",
+        )
 
 
-def _load_store() -> dict[str, Any]:
-    _ensure_store()
+def _load_store(email: str | None = None) -> dict[str, Any]:
+    path = _store_path(email)
+    _ensure_store(path)
     try:
-        return json.loads(_STORE_PATH.read_text(encoding="utf-8"))
+        return json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
-        data = _default_store()
-        _STORE_PATH.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        data = _default_store() if path == _GLOBAL_STORE else {"chat_history": [], "research_history": [], "saved_prompts": [], "threads": {}}
+        path.write_text(json.dumps(data, indent=2), encoding="utf-8")
         return data
 
 
-def _save_store(store: dict[str, Any]) -> None:
-    _STORE_PATH.write_text(json.dumps(store, indent=2), encoding="utf-8")
+def _save_store(store: dict[str, Any], email: str | None = None) -> None:
+    _store_path(email).write_text(json.dumps(store, indent=2), encoding="utf-8")
 
 
-def get_history() -> HistoryResponse:
-    """Return persisted chat, research and saved prompt history."""
-    store = _load_store()
+# ── Public API ────────────────────────────────────────────────────────────────
+
+def get_history(email: str | None = None) -> HistoryResponse:
+    """Return chat, research and saved prompt history for this user (or global)."""
+    store = _load_store(email)
     return HistoryResponse(
         chat_history=_validated_rows(list(store.get("chat_history", [])), ChatHistoryItem),
         research_history=_validated_rows(list(store.get("research_history", [])), ResearchHistoryItem),
@@ -116,9 +141,8 @@ def get_history() -> HistoryResponse:
     )
 
 
-def get_thread_history(thread_id: str) -> ThreadHistoryResponse:
-    """Return messages for a thread id (empty if missing)."""
-    store = _load_store()
+def get_thread_history(thread_id: str, email: str | None = None) -> ThreadHistoryResponse:
+    store = _load_store(email)
     thread = store.get("threads", {}).get(thread_id, {})
     raw_messages = thread.get("messages", [])
     if not isinstance(raw_messages, list):
@@ -129,12 +153,15 @@ def get_thread_history(thread_id: str) -> ThreadHistoryResponse:
     )
 
 
-def save_prompt(title: str, prompt_text: str) -> SavePromptResponse:
-    store = _load_store()
-    item = SavedPromptItem(id=f"prompt_{uuid.uuid4().hex[:8]}", title=title.strip(), prompt_text=prompt_text.strip())
-    saved = store.setdefault("saved_prompts", [])
-    saved.insert(0, item.model_dump())
-    _save_store(store)
+def save_prompt(title: str, prompt_text: str, email: str | None = None) -> SavePromptResponse:
+    store = _load_store(email)
+    item = SavedPromptItem(
+        id=f"prompt_{uuid.uuid4().hex[:8]}",
+        title=title.strip(),
+        prompt_text=prompt_text.strip(),
+    )
+    store.setdefault("saved_prompts", []).insert(0, item.model_dump())
+    _save_store(store, email)
     return SavePromptResponse(saved_prompt=item)
 
 
@@ -146,14 +173,16 @@ def save_chat_interaction(
     model_used: str | None = None,
     provider: str | None = None,
     fallback_used: bool | None = None,
+    email: str | None = None,
 ) -> None:
-    """Append user+assistant messages and keep chat history updated."""
-    store = _load_store()
+    store = _load_store(email)
     ts = _utc_now_iso()
+
     threads = store.setdefault("threads", {})
     thread_entry = threads.setdefault(thread_id, {"messages": []})
     messages = thread_entry.setdefault("messages", [])
     messages.append({"role": "user", "text": user_text, "timestamp": ts})
+
     assistant_msg: dict[str, Any] = {"role": "assistant", "text": assistant_text, "timestamp": ts}
     if intent is not None:
         assistant_msg["intent"] = intent
@@ -174,7 +203,8 @@ def save_chat_interaction(
             existing["title"] = title
     else:
         chat_history.insert(0, {"thread_id": thread_id, "title": title, "last_updated": ts})
-    _save_store(store)
+
+    _save_store(store, email)
 
 
 def save_research_run(
@@ -182,10 +212,9 @@ def save_research_run(
     ticker: str,
     model_used: str | None = None,
     provider: str | None = None,
+    email: str | None = None,
 ) -> None:
-    """Persist a research run marker for sentiment/fundamental workflows."""
-    store = _load_store()
-    runs = store.setdefault("research_history", [])
+    store = _load_store(email)
     entry: dict[str, Any] = {
         "id": f"research_{uuid.uuid4().hex[:8]}",
         "type": kind,
@@ -196,5 +225,5 @@ def save_research_run(
         entry["model_used"] = model_used
     if provider is not None:
         entry["provider"] = provider
-    runs.insert(0, entry)
-    _save_store(store)
+    store.setdefault("research_history", []).insert(0, entry)
+    _save_store(store, email)

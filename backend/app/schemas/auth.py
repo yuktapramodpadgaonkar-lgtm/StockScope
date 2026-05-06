@@ -3,9 +3,14 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 
+class RegisterRequest(BaseModel):
+    email: str = Field(min_length=1, max_length=254, description="User email")
+    password: str = Field(min_length=6, max_length=256, description="Password (min 6 chars)")
+
+
 class LoginRequest(BaseModel):
     email: str = Field(min_length=1, max_length=254, description="User email")
-    password: str = Field(min_length=1, max_length=256, description="Password (validated by mock rules)")
+    password: str = Field(min_length=1, max_length=256, description="Password")
 
 
 class UserPublic(BaseModel):
@@ -24,4 +29,4 @@ class MeResponse(BaseModel):
 
 class LogoutResponse(BaseModel):
     ok: bool = True
-    detail: str = "Mock auth is stateless; discard the token on the client."
+    detail: str = "Token is stateless; discard it on the client to log out."

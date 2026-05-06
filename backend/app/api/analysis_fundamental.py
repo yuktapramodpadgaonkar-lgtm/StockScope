@@ -5,14 +5,15 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.schemas.fundamental import FundamentalAnalysisResponse
 from app.services.ai.fundamental_prompt import build_fundamental_prompt
-from app.services.ai.llm_client import generate_text
 from app.services.auth_service import verify_access_token
 from app.services.fundamental_service import get_fundamental_report
+from services.ai.llm_service import LLMService
 
 router = APIRouter(prefix="/api/analysis/fundamental", tags=["Fundamental Analysis"])
 
 LLM_UNAVAILABLE = "AI summary unavailable. Deterministic analysis is still provided."
 _bearer = HTTPBearer(auto_error=False)
+_llm = LLMService()
 
 
 def _ai_error_message(llm_detail: str | None) -> str:
@@ -41,13 +42,9 @@ def get_fundamental_analysis(
         False,
         description="If true, request an optional AI explanation (best-effort).",
     ),
-    provider: str = Query(
-        "ollama",
-        description="LLM provider to use when include_llm is true (ollama|gemini).",
-    ),
-    model: str = Query(
-        "mistral:7b",
-        description="LLM model id. Examples: mistral:7b, llama3.1:8b, gemini-3-flash-preview.",
+    preferred_model: str = Query(
+        "gemini",
+        description="Preferred LLM: gemini | llama | mistral (auto-fallback applies).",
     ),
     _email: str = Depends(_require_bearer_email),
 ) -> FundamentalAnalysisResponse:
@@ -65,12 +62,12 @@ def get_fundamental_analysis(
 
     if include_llm:
         prompt = build_fundamental_prompt(data)
-        result = generate_text(prompt, provider=provider, model=model)
-        ai_model = result.get("model") or model
-        ai_summary = result.get("text")
-        if result.get("error"):
-            ai_summary = None
-            ai_error = _ai_error_message(str(result.get("error")))
+        llm_result = _llm.generate_response(prompt, preferred_model=preferred_model)
+        if llm_result.error or not llm_result.response:
+            ai_error = _ai_error_message(llm_result.error)
+        else:
+            ai_summary = llm_result.response
+            ai_model = llm_result.model_used
 
     payload = {
         **data,

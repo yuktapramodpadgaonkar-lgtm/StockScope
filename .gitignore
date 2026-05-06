@@ -39,3 +39,4 @@ backend/evaluation/results/
 # Local eval/memory artifacts
 data/eval/
 data/memory/
+backend/data/users.db
