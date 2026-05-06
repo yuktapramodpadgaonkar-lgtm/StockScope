@@ -21,7 +21,7 @@ This checklist maps directly to the current `StockScope` repository structure.
 - News chunks + `text_sha256`, `ingested_at`
 
 ### `backend/app/rag/ingest_filings.py`
-- Filing chunks (4000-char slices) + `text_sha256`, `ingested_at`
+- **Section-aware** filing chunks when `sections` is present on SEC items (10-K/10-Q Items: business, **risk_factors**, **mdna**, **legal_proceedings**, **liquidity** (split from MD&A when headed), **financial_statements**, etc.); see `sec_section_chunking.py`. Long sections split at ~14k chars. Legacy **4000-char** windows if HTML had no parseable Item headers (e.g. some 8-K).
 
 ### `backend/app/rag/hybrid_retriever.py`
 - **Hybrid:** normalized BM25 + normalized cosine (when embeddings exist)

@@ -64,7 +64,22 @@ Fallback order (per request): Gemini → LLaMA → Mistral. All LLM calls are ha
 - Runs the same prompt through Gemini, LLaMA, and Mistral independently
 - Returns latency, citation count, and safety status per model
 
-### 7. History
+### 7. Evaluation rubric harness
+- **`backend/evaluation/eval_set.json`** — **75** cases (fundamental, buy/sell, news, chat, market movers, safety, auth, citations, memory, multi-model, **agentic RAG** `rub-061`–`rub-075`)
+- **`backend/evaluation/run_batch_eval.py`** — batch runner with optional `--live-fundamental`, `--live-news`, `--live-market-data`, `--live-orchestrator`, `--live-multi`; writes CSV/JSON under `backend/evaluation/results/` (gitignored)
+- **`backend/evaluation/run_eval.py`** — buy/sell agent pipeline smoke eval (yfinance; subsets via `--max-cases`)
+- **Structured logs** — append-only `backend/logs/model_calls.jsonl` and `backend/logs/tool_calls.jsonl` (gitignored)
+- **Honest agent/RAG/memory status** — [`docs/AGENT_RAG_MEMORY_STATUS.md`](docs/AGENT_RAG_MEMORY_STATUS.md)
+ - **Agentic RAG (rubric D)** — `POST /api/agentic-research/run` (planner → tools → writer → critic; planner **retry** on bad/short plan); UI: **`/agentic-research`**; doc: `docs/AGENTIC_RAG_AND_MEMORY.md`; batch: `python backend/evaluation/run_batch_eval.py --category agentic_rag --live-agentic`
+
+**Batch eval commands**
+
+```bash
+python backend/evaluation/run_batch_eval.py
+python backend/evaluation/run_batch_eval.py --category agentic_rag --live-agentic
+```
+
+### 8. History
 - Persisted chat threads, research runs, saved prompts
 - Records model_used, provider, intent, fallback_used per interaction
 

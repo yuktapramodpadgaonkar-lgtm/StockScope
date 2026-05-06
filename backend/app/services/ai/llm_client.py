@@ -11,6 +11,7 @@ from typing import Any
 import httpx
 
 from app.core.config import settings
+from app.observability.jsonl_audit import log_model_call
 
 DEFAULT_TIMEOUT_SEC = 120.0
 
@@ -150,27 +151,57 @@ def generate_text(
         elif prov == "gemini":
             text = _gemini_generate_text(prompt, mod)
         else:
+            err = f"Unsupported provider '{prov}'"
+            log_model_call(
+                provider=prov,
+                model=mod,
+                task="llm_client.generate_text",
+                prompt=prompt,
+                output=None,
+                latency_ms=None,
+                error=err,
+            )
             return {
                 "text": None,
                 "provider": prov,
                 "model": mod,
                 "latency_ms": None,
-                "error": f"Unsupported provider '{prov}'",
+                "error": err,
             }
     except (OllamaClientError, GeminiClientError) as e:
+        lat = int(_now_ms() - start_ms)
+        log_model_call(
+            provider=prov,
+            model=mod,
+            task="llm_client.generate_text",
+            prompt=prompt,
+            output=None,
+            latency_ms=lat,
+            error=str(e),
+        )
         return {
             "text": None,
             "provider": prov,
             "model": mod,
-            "latency_ms": int(_now_ms() - start_ms),
+            "latency_ms": lat,
             "error": str(e),
         }
 
+    lat = int(_now_ms() - start_ms)
+    log_model_call(
+        provider=prov,
+        model=mod,
+        task="llm_client.generate_text",
+        prompt=prompt,
+        output=text,
+        latency_ms=lat,
+        error=None,
+    )
     return {
         "text": text,
         "provider": prov,
         "model": mod,
-        "latency_ms": int(_now_ms() - start_ms),
+        "latency_ms": lat,
         "error": None,
     }
 

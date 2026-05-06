@@ -43,12 +43,30 @@ def main() -> int:
     from app.evaluation.metrics import score_report_dict
 
     cases = json.loads((EVAL_DIR / "eval_set.json").read_text(encoding="utf-8"))
+
+    def _orchestrator_rows(rows: list[dict]) -> list[tuple[object, dict]]:
+        out: list[tuple[object, dict]] = []
+        for row in rows:
+            if row.get("runner") == "buy_sell_orchestrator":
+                inp = row.get("input") or {}
+                out.append((row.get("id"), inp))
+            elif row.get("category") == "buy_sell" and isinstance(row.get("input"), dict):
+                inp = row["input"]
+                if inp.get("ticker"):
+                    out.append((row.get("id"), inp))
+            elif "ticker" in row and "category" not in row:
+                out.append((row.get("id"), row))
+        return out
+
+    orch = _orchestrator_rows(cases)
     if args.max_cases and args.max_cases > 0:
-        cases = cases[: args.max_cases]
+        orch = orch[: args.max_cases]
+    if not orch:
+        print("No buy_sell orchestrator cases in eval_set.json; nothing to run.", file=sys.stderr)
+        return 0
 
     results: list[dict] = []
-    for row in cases:
-        cid = row.get("id")
+    for cid, row in orch:
         ticker = str(row.get("ticker") or "").upper()
         t0 = time.perf_counter()
         err = None

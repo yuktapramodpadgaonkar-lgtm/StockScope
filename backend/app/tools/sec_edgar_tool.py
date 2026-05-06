@@ -10,6 +10,7 @@ import httpx
 from lxml import html as lxml_html
 
 from app.core.config import settings
+from app.rag.sec_section_chunking import extract_sections_from_sec_html, sections_to_flat_text
 from app.rag.store import RAG_DIR
 
 SEC_TICKER_CACHE = RAG_DIR / "sec" / "company_tickers.json"
@@ -84,7 +85,32 @@ def _html_to_text(content: bytes) -> str:
         return content.decode("utf-8", errors="ignore")[: settings.sec_filing_max_download_chars]
 
 
+def _parse_filing_body(body: bytes, primary_document: str, content_type: str) -> tuple[str, list[dict[str, Any]] | None]:
+    """
+    HTML: try section-aware parse (10-K/10-Q Items); fall back to flat HTML text.
+    Returns (flat_text_for_legacy, sections_or_none).
+    """
+    mx = max(10_000, int(settings.sec_filing_max_download_chars))
+    if len(body) > mx:
+        body = body[:mx]
+    ctype = (content_type or "").lower()
+    if "html" in ctype or primary_document.lower().endswith((".htm", ".html")):
+        sections = extract_sections_from_sec_html(body)
+        if sections:
+            flat = sections_to_flat_text(sections)
+            return flat[:mx], sections
+        return _html_to_text(body)[:mx], None
+    return body.decode("utf-8", errors="ignore")[:mx], None
+
+
 def _fetch_filing_text(cik_int: int, accession: str, primary_document: str) -> str:
+    text, _sections = _fetch_filing_text_and_sections(cik_int, accession, primary_document)
+    return text
+
+
+def _fetch_filing_text_and_sections(
+    cik_int: int, accession: str, primary_document: str
+) -> tuple[str, list[dict[str, Any]] | None]:
     acc_nd = _accession_to_nodash(accession)
     cik_part = str(int(cik_int))
     path = f"/Archives/edgar/data/{cik_part}/{acc_nd}/{primary_document}"
@@ -96,12 +122,7 @@ def _fetch_filing_text(cik_int: int, accession: str, primary_document: str) -> s
         r.raise_for_status()
         body = r.content
         ctype = (r.headers.get("content-type") or "").lower()
-    mx = max(10_000, int(settings.sec_filing_max_download_chars))
-    if len(body) > mx:
-        body = body[:mx]
-    if "html" in ctype or primary_document.lower().endswith((".htm", ".html")):
-        return _html_to_text(body)[:mx]
-    return body.decode("utf-8", errors="ignore")[:mx]
+    return _parse_filing_body(body, primary_document, ctype)
 
 
 def fetch_recent_filings_bundle(ticker: str, *, limit: int = 3) -> tuple[dict[str, Any], int]:
@@ -174,7 +195,7 @@ def fetch_recent_filings_bundle(ticker: str, *, limit: int = 3) -> tuple[dict[st
         if not acc or not doc:
             continue
         try:
-            text = _fetch_filing_text(cik_int, str(acc), str(doc))
+            text, filing_sections = _fetch_filing_text_and_sections(cik_int, str(acc), str(doc))
             calls += 1
         except Exception as e:
             items.append(
@@ -192,17 +213,18 @@ def fetch_recent_filings_bundle(ticker: str, *, limit: int = 3) -> tuple[dict[st
             )
             continue
 
-        items.append(
-            {
-                "title": f"{form} filed {fdate}",
-                "published_at": str(fdate),
-                "form": str(form),
-                "accession": str(acc),
-                "url": f"https://www.sec.gov/Archives/edgar/data/{int(cik_int)}/{_accession_to_nodash(str(acc))}/{doc}",
-                "source": "sec_edgar",
-                "text": text,
-            }
-        )
+        entry: dict[str, Any] = {
+            "title": f"{form} filed {fdate}",
+            "published_at": str(fdate),
+            "form": str(form),
+            "accession": str(acc),
+            "url": f"https://www.sec.gov/Archives/edgar/data/{int(cik_int)}/{_accession_to_nodash(str(acc))}/{doc}",
+            "source": "sec_edgar",
+            "text": text,
+        }
+        if filing_sections:
+            entry["sections"] = filing_sections
+        items.append(entry)
 
     bundle = {
         "ticker": sym,

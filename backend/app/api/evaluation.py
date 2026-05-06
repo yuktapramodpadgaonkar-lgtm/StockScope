@@ -14,6 +14,7 @@ from typing import Literal
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
+from app.observability.jsonl_audit import log_model_call
 from services.ai.llm_service import LLMService
 from services.ai.prompts import build_multi_model_comparison_prompt
 
@@ -67,7 +68,12 @@ def _safety_passed(text: str) -> bool:
     return not bool(_ADVICE_RE.search(text))
 
 
-def _call_single_model(model_name: str, prompt: str) -> ModelResult:
+def _call_single_model(
+    model_name: str,
+    prompt: str,
+    *,
+    eval_task: str = "compare",
+) -> ModelResult:
     start = time.time()
     error: str | None = None
     response = ""
@@ -85,6 +91,16 @@ def _call_single_model(model_name: str, prompt: str) -> ModelResult:
         response = f"[Model unavailable: {error}]"
 
     latency_ms = int((time.time() - start) * 1000)
+    provider = "google" if model_name == "gemini" else "ollama"
+    log_model_call(
+        provider=provider,
+        model=model_name,
+        task=f"evaluation.compare_models.{eval_task}",
+        prompt=prompt,
+        output=response if not error else None,
+        latency_ms=latency_ms,
+        error=error,
+    )
     return ModelResult(
         model=model_name,
         response=response,
@@ -111,9 +127,9 @@ def compare_models(body: CompareRequest) -> CompareResponse:
     )
 
     results = [
-        _call_single_model("gemini", prompt),
-        _call_single_model("llama", prompt),
-        _call_single_model("mistral", prompt),
+        _call_single_model("gemini", prompt, eval_task=body.task),
+        _call_single_model("llama", prompt, eval_task=body.task),
+        _call_single_model("mistral", prompt, eval_task=body.task),
     ]
 
     return CompareResponse(

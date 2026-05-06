@@ -14,11 +14,13 @@ call_llm or call_llm_with_fallback (those belong to the shared router).
 from __future__ import annotations
 
 import logging
+import time
 from typing import Any
 
 import httpx
 
 from app.core.config import settings
+from app.observability.jsonl_audit import log_model_call
 from services.ai.schemas import LLMResponse
 
 logger = logging.getLogger(__name__)
@@ -66,17 +68,19 @@ class LLMService:
             raise RuntimeError("GEMINI_API_KEY is not set in environment.")
 
         model = (settings.gemini_model or "gemini-1.5-flash").strip()
-        url = (
-            f"https://generativelanguage.googleapis.com/v1beta/models"
-            f"/{model}:generateContent?key={api_key}"
-        )
+        # Use header auth (avoid leaking keys via URLs/logs).
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+        headers = {
+            "x-goog-api-key": api_key,
+            "Content-Type": "application/json",
+        }
         payload: dict[str, Any] = {
             "contents": [{"parts": [{"text": prompt}]}],
             "generationConfig": {"temperature": 0.3, "maxOutputTokens": 1024},
         }
 
         with httpx.Client(timeout=_GEMINI_TIMEOUT) as client:
-            r = client.post(url, json=payload)
+            r = client.post(url, headers=headers, json=payload)
             r.raise_for_status()
 
         data = r.json()
@@ -179,9 +183,20 @@ class LLMService:
             generator = _generators.get(name)
             if generator is None:
                 continue
+            model_label, provider_label = _PROVIDER_META[name]
+            t0 = time.perf_counter()
             try:
                 text = generator(prompt)
-                model_label, provider_label = _PROVIDER_META[name]
+                ms = (time.perf_counter() - t0) * 1000.0
+                log_model_call(
+                    provider=provider_label,
+                    model=model_label,
+                    task="llm_service.generate_response",
+                    prompt=prompt,
+                    output=text,
+                    latency_ms=round(ms, 2),
+                    error=None,
+                )
                 return LLMResponse(
                     model_used=model_label,
                     provider=provider_label,
@@ -191,6 +206,16 @@ class LLMService:
                 )
             except Exception as exc:  # noqa: BLE001
                 last_error = str(exc)
+                ms = (time.perf_counter() - t0) * 1000.0
+                log_model_call(
+                    provider=provider_label,
+                    model=model_label,
+                    task="llm_service.generate_response",
+                    prompt=prompt,
+                    output=None,
+                    latency_ms=round(ms, 2),
+                    error=str(exc)[:500],
+                )
                 logger.warning("LLM provider '%s' failed: %s", name, exc)
                 continue
 

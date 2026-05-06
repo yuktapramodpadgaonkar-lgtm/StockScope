@@ -7,6 +7,7 @@ See `schemas/buy_sell_report.json` at the repo root for the frozen JSON Schema (
 from __future__ import annotations
 
 from enum import Enum
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -199,6 +200,10 @@ class MemoryBlock(BaseModel):
     analysis_style: str | None = "balanced"
     session_summary: str = ""
     follow_up_context: str = ""
+    memory_profile: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Long-horizon summary: frequent_tickers, preferred_topics, risk_style.",
+    )
 
 
 class BuySellReport(BaseModel):

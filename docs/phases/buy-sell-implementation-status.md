@@ -117,14 +117,15 @@ This document tracks **Phases 1–8** from [`docs/BuySellAnalysis-roadmap.md`](.
 
 ---
 
-## Phase 8 — Evaluation (**done**, v1)
+## Phase 8 — Evaluation (**done**, v1 + rubric expansion)
 
 | Roadmap item | Implementation |
 |--------------|----------------|
-| 20 `eval_set.json` | [`backend/evaluation/eval_set.json`](../../backend/evaluation/eval_set.json) (12 starter cases — grow toward 50+) |
+| 20 `eval_set.json` | [`backend/evaluation/eval_set.json`](../../backend/evaluation/eval_set.json) — **60** rubric-oriented cases (multi-category); buy/sell orchestrator rows use `"runner": "buy_sell_orchestrator"` |
 | 21 `few_shot_examples.json` | [`backend/evaluation/few_shot_examples.json`](../../backend/evaluation/few_shot_examples.json) |
 | 22 `run_eval.py` + metrics | [`backend/evaluation/run_eval.py`](../../backend/evaluation/run_eval.py) (`--inline`), [`backend/app/evaluation/metrics.py`](../../backend/app/evaluation/metrics.py) — writes `data/eval/last_eval_run.json` by default |
-| 23 Multi-model comparison | **Not implemented** (requires additional provider wiring + eval protocol) |
+| 23 Multi-model comparison | **Implemented** — `POST /api/evaluation/compare-models` ([`backend/app/api/evaluation.py`](../../backend/app/api/evaluation.py)): Gemini + Ollama LLaMA + Ollama Mistral; latency, citation count, and safety flag per model |
+| 24 Batch rubric scaffold | [`backend/evaluation/run_batch_eval.py`](../../backend/evaluation/run_batch_eval.py) — optional `--live-*` flags; results under `backend/evaluation/results/` (gitignored) |
 
 See [`backend/evaluation/README.md`](../../backend/evaluation/README.md).
 
@@ -141,10 +142,10 @@ These support the product but are **not** the Phase 1–8 list above:
 
 ## What is **yet to implement** (concise backlog)
 
-1. **Phase 8 item 23** — Multi-model comparison harness (same eval across HF / OpenAI / etc.).  
+1. **Phase 8** — Extend batch runner scoring (gold labels, automated judges) and optional full batch over all live flags in CI.  
 2. **Phase 6 refinements** — LLM planner, richer critic (e.g. citation parity checks), durable trace logging.  
 3. **Phase 7 refinements** — Auth-scoped sessions, encrypted store, semantic “memory retrieval” for chat.  
-4. **Optional refinements** — Full LLM-driven rewrite of each long report section (beyond `llm_review`); RAG Phase 5.2 items; stale-data warnings surfaced in UI; expand `eval_set.json` with gold labels for automated scoring.
+4. **Optional refinements** — Full LLM-driven rewrite of each long report section (beyond `llm_review`); RAG Phase 5.2 items; stale-data warnings surfaced in UI; add **gold labels** and automated scoring on top of the expanded `eval_set.json`.
 
 ---
 
