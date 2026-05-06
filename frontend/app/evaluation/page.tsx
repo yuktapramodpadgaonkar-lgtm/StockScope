@@ -5,6 +5,21 @@ import { useState } from "react";
 
 import { postCompareModels, type CompareResponse, type EvalTask, type ModelResult } from "@/lib/evaluation-api";
 
+function ScoreDots({ score, max = 5 }: { score: number; max?: number }) {
+  return (
+    <span className="flex items-center gap-0.5">
+      {Array.from({ length: max }).map((_, i) => (
+        <span
+          key={i}
+          className={`inline-block h-2 w-2 rounded-full ${
+            i < score ? "bg-teal-500" : "bg-slate-200"
+          }`}
+        />
+      ))}
+    </span>
+  );
+}
+
 const TASK_OPTIONS: { value: EvalTask; label: string }[] = [
   { value: "chat", label: "Chat" },
   { value: "sentiment", label: "News Sentiment" },
@@ -54,6 +69,32 @@ function ModelCard({ result }: { result: ModelResult }) {
         </div>
       </div>
 
+      {result.judge_score ? (
+        <div className="mt-4 rounded-xl border border-teal-100 bg-teal-50/60 px-4 py-3">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-teal-700">
+            LLM Judge · Overall {result.judge_score.overall}/5
+          </p>
+          <div className="mt-2 grid grid-cols-3 gap-3">
+            {(["relevance", "clarity", "safety"] as const).map((dim) => (
+              <div key={dim}>
+                <p className="text-[10px] capitalize text-slate-500">{dim}</p>
+                <div className="mt-1 flex items-center gap-1.5">
+                  <ScoreDots score={result.judge_score![dim]} />
+                  <span className="text-xs font-semibold text-slate-700">
+                    {result.judge_score![dim]}/5
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+          {result.judge_score.reasoning ? (
+            <p className="mt-2 text-xs leading-relaxed text-slate-600">
+              {result.judge_score.reasoning}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
       {result.error ? (
         <p className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
           {result.error}
@@ -98,6 +139,9 @@ function ComparisonTable({ results }: { results: ModelResult[] }) {
             <th className="px-5 py-3 text-center text-xs font-semibold uppercase tracking-wide text-slate-500">
               Safety
             </th>
+            <th className="px-5 py-3 text-center text-xs font-semibold uppercase tracking-wide text-teal-600">
+              Judge score
+            </th>
             <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
               Status
             </th>
@@ -115,6 +159,18 @@ function ComparisonTable({ results }: { results: ModelResult[] }) {
               <td className="px-5 py-3 text-right text-slate-700">{r.citation_count}</td>
               <td className="px-5 py-3 text-center">
                 <SafetyBadge passed={r.safety_passed} />
+              </td>
+              <td className="px-5 py-3 text-center">
+                {r.judge_score ? (
+                  <div className="flex items-center justify-center gap-1.5">
+                    <ScoreDots score={r.judge_score.overall} />
+                    <span className="text-xs font-bold text-teal-700">
+                      {r.judge_score.overall}/5
+                    </span>
+                  </div>
+                ) : (
+                  <span className="text-xs text-slate-400">—</span>
+                )}
               </td>
               <td className="px-5 py-3">
                 {r.error ? (
@@ -171,8 +227,8 @@ export default function EvaluationPage() {
             Model Evaluation
           </h1>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-600 sm:text-base">
-            Run the same prompt through Gemini, LLaMA, and Mistral and compare latency, citations,
-            and safety side-by-side.
+            Run the same prompt through Gemini, LLaMA, and Mistral. Gemini then acts as an
+            impartial judge — scoring each response on relevance, clarity, and safety (1–5).
           </p>
         </div>
       </header>

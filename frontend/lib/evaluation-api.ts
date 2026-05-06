@@ -2,6 +2,14 @@ import { getApiBase, readErrorMessage } from "@/lib/auth-api";
 
 export type EvalTask = "chat" | "sentiment" | "buy_sell" | "fundamental";
 
+export type JudgeScore = {
+  relevance: number;
+  clarity: number;
+  safety: number;
+  overall: number;
+  reasoning: string;
+};
+
 export type ModelResult = {
   model: string;
   response: string;
@@ -9,6 +17,7 @@ export type ModelResult = {
   citation_count: number;
   safety_passed: boolean;
   error: string | null;
+  judge_score: JudgeScore | null;
 };
 
 export type CompareRequest = {
