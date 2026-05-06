@@ -1,162 +1,316 @@
-# StockScope AI
+# 📌 StockScope — AI-Powered Stock Research Platform
 
-StockScope AI is a stock research platform for CMPE-258.
+## 👥 Team Members
+- Yukta Pramod Padgaonkar  
+- Ramya Gopalaswamy  
+- Revati Dharmadhikari  
 
-This repository currently contains the Market Movers slice (Person 1 scope)
-with:
+---
 
-- FastAPI app bootstrap and CORS for the Next.js UI
-- Market movers API route
-- Provider abstraction for market data
-- Deterministic ranking logic
-- Universe files for index filtering
-- Next.js + TypeScript + Tailwind **Market Movers** page (`/market-movers`)
+## 📊 Project Overview
 
-## Isolated Python environment (recommended)
+StockScope is a **vertical AI-powered stock research platform** designed to provide structured, explainable, and data-driven insights for retail investors.
 
-Keep dependencies inside this repo so they do not affect your system Python or other projects.
+The system integrates:
+- market data
+- financial fundamentals
+- news sentiment
+- conversational AI
 
-**Prerequisite:** Python 3.10+ installed and available as `python` (or `py` on Windows).
+into a unified interface for stock analysis and decision support.
 
-All commands below assume your **current directory is the repo root**:
+---
 
-`C:\Users\018464615\Downloads\Sem2\CMPE-258\Project\StockScope`
+## 🎯 Problem Statement
 
-### Windows (PowerShell)
+Retail investors rely on fragmented tools such as:
+- price charts
+- news feeds
+- financial reports
 
-1. Create the virtual environment (once):
+These tools:
+- lack integration
+- provide unstructured insights
+- do not explain reasoning clearly
 
-   ```powershell
-   python -m venv .venv
-   ```
+StockScope addresses this by building an **evaluation-driven AI system** that combines deterministic analytics with AI-based reasoning.
 
-2. Activate it **every time** you open a new terminal for this project:
+---
 
-   ```powershell
-   .\.venv\Scripts\Activate.ps1
-   ```
+## 🧠 Core Features
 
-   If you see an execution policy error, run PowerShell as Administrator once:
+### 1. Market Movers
+- Displays top gainers and losers
+- Shows price, percentage change, and volume
+- Interactive table UI for quick exploration
+- Market movers (API, yfinance, ranking, caching): see docs/MARKET_MOVERS.md.
+---
 
-   ```powershell
-   Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-   ```
+### 2. Buy/Sell Analysis (Phase 1 + Layer 1)
+- Kavout-style structured report schema for BUY/HOLD/SELL outputs
+- Mock report API + UI page for contract testing
+- Layer 1 data bundle API with provider call ledger
+- Local technical computation (RSI/MACD/MAs) from one shared history fetch
+- Buy/sell roadmap and source strategy docs:
+  - `docs/BuySellAnalysis-roadmap.md`
+  - `docs/BuySellAnalysis-data-sources.md`
+  - `docs/Layer1-api-call-ledger.md`
 
-   Or use **Command Prompt** activation instead (see below).
+---
 
-3. Your prompt should show `(.venv)`. Install packages:
+### 3. Fundamental Analysis
+- Extracts financial metrics (P/E, ROE, margins, growth)
+- Applies rule-based evaluation for financial health
+- Generates structured report including:
+  - strengths
+  - risks
+  - overall verdict
 
-   ```powershell
-   python -m pip install --upgrade pip
-   pip install -r backend\requirements.txt
-   ```
+---
 
-4. When you are done, you can deactivate:
+### 4. News Sentiment Analysis
+- Retrieves recent news for a ticker
+- Aggregates sentiment signals
+- Identifies major themes affecting stock movement
 
-   ```powershell
-   deactivate
-   ```
+---
 
-### Windows (Command Prompt)
+### 5. Chatbot
+- Natural language stock queries
+- Planned agent-based reasoning system
 
-```cmd
-cd C:\Users\018464615\Downloads\Sem2\CMPE-258\Project\StockScope
-python -m venv .venv
-.venv\Scripts\activate.bat
-python -m pip install --upgrade pip
-pip install -r backend\requirements.txt
-```
+---
 
-### macOS / Linux
+### 6. History & Memory (In Progress)
+- Stores chat history
+- Tracks previous research queries
+- Planned long-horizon memory
+
+---
+
+
+## 🗂️ Data Sources
+
+- **yfinance**
+  - stock prices / historical candles
+  - fundamentals and company profile fields
+  - fallback news headlines when Alpha Vantage is not configured
+
+- **Alpha Vantage (implemented, optional via API key)**
+  - `NEWS_SENTIMENT` feed for ticker news + sentiment metadata
+
+- **Finnhub (implemented, optional via API key)**
+  - analyst recommendation trend data (`/stock/recommendation`)
+
+- **Polygon.io (implemented for scripts, not runtime API)**
+  - ticker validation and name enrichment for universe CSV refresh scripts
+  - does not provide full index-constituent lists via one REST endpoint
+
+- **SEC EDGAR + Press Releases (planned for retrieval/RAG)**
+  - filing-grounded evidence and company-issued event text
+
+---
+
+## ⚙️ Technical Architecture
+
+### Frontend
+- Next.js (React)
+- TypeScript
+- Tailwind CSS
+
+### Backend
+- FastAPI (Python)
+- Service-based modular architecture
+- Pydantic schemas for structured outputs
+
+### AI Design (Planned)
+- LLM integration (GPT / Llama / Mistral)
+- Agent system (Planner–Executor–Critic)
+- Hybrid RAG (vector + keyword retrieval)
+- FinBERT sentiment model
+
+---
+
+## 🔄 System Flow
+
+Frontend → API Layer → Service Layer → Schema Validation → Response
+
+Example:
+
+User → Fundamental API → yfinance → Rule Engine → Structured Output → UI
+
+---
+
+## 🧪 Evaluation Plan (Upcoming)
+
+We will evaluate system performance using:
+
+### Dataset
+- 100+ test cases across:
+  - price explanations
+  - fundamental analysis
+  - sentiment analysis
+  - chatbot queries
+
+### Metrics
+- numerical accuracy
+- response completeness
+- hallucination rate
+- latency and cost
+
+### Model Comparison
+- GPT-4o (baseline)
+- Open-source model (Llama / Mistral)
+- Secondary model (TBD)
+
+---
+
+## 🚧 Current Progress
+
+### ✅ Completed
+- Backend APIs for:
+  - buy/sell analysis:
+    - phase 1 report schema + mock endpoint
+    - phase 2 layer1 data bundle endpoint (`/api/buy-sell/data/{ticker}`)
+  - fundamental analysis
+  - market movers
+  - sentiment (basic)
+  - chat (skeleton)
+  - auth (mock)
+- Frontend pages:
+  - buy/sell report (mock)
+  - market movers
+  - fundamentals
+  - chatbot
+  - history
+  - login
+- Structured schemas for all modules
+- Deterministic fundamental analysis engine
+- Layer1 source docs and call-budget tracking:
+  - `docs/API-keys.md`
+  - `docs/API-keys-testing.md`
+  - `docs/Layer1-api-call-ledger.md`
+
+---
+
+### 🔄 In Progress
+- Buy/sell scoring engine (fundamental / technical / sentiment scores)
+- Buy/sell report synthesis pipeline from Layer1 bundle
+- News sentiment refinement and source fallback handling
+- Retrieval source prep (SEC + press release ingestion design)
+- Chatbot routing and responses
+
+---
+
+### ⏳ Pending
+- LLM integration
+- Agent-based reasoning system
+- Hybrid RAG with citations
+- Multi-model comparison
+- Long-horizon memory
+- Formal eval harness for 50+ buy/sell test cases
+
+---
+
+## 🔮 Next Steps
+
+1. Complete Buy/Sell scoring + final recommendation mapping (see `docs/BuySellAnalysis-roadmap.md`)  
+2. Integrate LLM section writer for buy/sell narratives with citations  
+3. Implement Planner–Executor–Critic workflow for buy/sell + chat paths  
+4. Add hybrid RAG over SEC + press release + general news sources  
+5. Expand eval dataset and multi-model benchmarking  
+6. Improve sentiment quality and fallback behavior  
+7. Implement Google OAuth authentication  
+
+Buy/Sell planning docs:
+- `docs/BuySellAnalysis-roadmap.md`
+- `docs/BuySellAnalysis-data-sources.md`
+- `docs/BuySellAnalysis-retrieval-sources.md`
+
+---
+
+## 🚀 Setup & Running the Project
+
+### 🔧 Backend Setup
 
 ```bash
-cd /path/to/StockScope
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
+python -m venv .venv
+source .venv/bin/activate  # Mac/Linux
+.venv\Scripts\activate    # Windows
+```
+
+```bash
+pip install --upgrade pip
 pip install -r backend/requirements.txt
 ```
 
-The folder `.venv/` is listed in `.gitignore` and should **not** be committed.
+---
 
-## Quick Start (Backend)
+### ▶️ Run Backend
 
-1. Create and activate the virtual environment (see above).
-2. Copy env file:
+```bash
+uvicorn app.main:app --reload --app-dir backend
+```
 
-   - Windows: `copy backend\.env.example backend\.env`
-   - macOS/Linux: `cp backend/.env.example backend/.env`
+Interactive API docs: **http://127.0.0.1:8000/docs**
 
-3. **Optional — AI explanations on Fundamental analysis:** set `GEMINI_API_KEY` in
-   `backend/.env` if you use the **Gemini** model in the UI. For **Mistral** and
-   **Llama 3.1**, run [Ollama](https://ollama.com/) locally and pull models (from
-   any terminal):
+### Fundamental analysis + multi-model AI (optional)
 
-   ```bash
-   ollama pull mistral:7b
-   ollama pull llama3.1:8b
-   ```
+- Set **`GEMINI_API_KEY`** in `backend/.env` for the **Gemini** option on **`/fundamentals`**.
+- For **Mistral** / **Llama 3.1**, run [Ollama](https://ollama.com/) and pull models:
 
-   Override the Ollama URL only if needed: `OLLAMA_BASE_URL` in `backend/.env`
-   (default `http://localhost:11434`).
+  ```bash
+  ollama pull mistral:7b
+  ollama pull llama3.1:8b
+  ```
 
-4. Start API (from **repo root**, with `.venv` activated):
+- Override **`OLLAMA_BASE_URL`** in `backend/.env` if Ollama is not on `http://localhost:11434`.
+- Each **Analyze** sends `include_llm=true` with the selected provider/model; deterministic
+  metrics still load if the LLM fails (see **`ai_error`** in the UI).
 
-   ```powershell
-   uvicorn app.main:app --reload --app-dir backend
-   ```
+### ⚠️ CORS Configuration
 
-5. Open `http://127.0.0.1:8000/docs` for interactive API docs.
+Ensure `backend/.env` contains:
 
-6. For browser access from the frontend, ensure `backend/.env` includes
-   `CORS_ORIGINS` with `http://localhost:3000` and `http://127.0.0.1:3000`
-   (see `backend/.env.example`).
+`CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000`
 
-## Fundamental analysis + mock auth + multi-model AI
+### 🔑 API Keys
 
-- **UI:** sign in on `http://localhost:3000`, then open **`/fundamentals`**.
-- **Deterministic metrics** (yfinance + rule-based strengths/risks) always load first;
-  the selected **AI model** only explains that snapshot.
-- **Model dropdown:** **Gemini** (API key), **Mistral** and **Llama 3.1** (Ollama).
-  Each **Analyze** request calls the API with `include_llm=true` and the matching
-  `provider` / `model` query parameters.
-- If the LLM is unavailable, the UI still shows metrics and an **`ai_error`** message.
+Copy `backend/.env.example` to `backend/.env`. For Layer 1 / news / scripts, see
+[`docs/API-keys.md`](docs/API-keys.md) and [`docs/API-keys-testing.md`](docs/API-keys-testing.md).
 
-## Frontend (Market Movers UI)
+---
 
-**Prerequisite:** [Node.js](https://nodejs.org/) 20+ (includes `npm`).
+### 🌐 Frontend Setup
 
-The frontend does **not** use Python or the repo’s `.venv`—only Node and `npm`.
-(You can use **nvm** / **fnm** on your machine to pin a Node version; that is
-separate from the backend virtual environment.)
+```bash
+cd frontend
+cp .env.local.example .env.local
+npm install
+npm run dev
+```
 
-1. From the repo root:
+Open **http://localhost:3000** — e.g. **`/market-movers`**, **`/fundamentals`**, **`/chatbot`**.
 
-   ```powershell
-   cd frontend
-   copy .env.local.example .env.local
-   npm install
-   npm run dev
-   ```
+---
 
-2. Open `http://localhost:3000` — use **Open Market Movers** or go to
-   `http://localhost:3000/market-movers`. **Fundamental analysis** (with optional
-   AI explanation) lives at `http://localhost:3000/fundamentals`.
+### 🔗 Backend–Frontend Connection
 
-3. Keep the FastAPI server running on `http://127.0.0.1:8000`. The UI reads
-   `NEXT_PUBLIC_API_BASE_URL` from `frontend/.env.local` (default in the example
-   file matches that URL).
+Backend: http://127.0.0.1:8000
 
-The page includes category tabs, universe and time-mode filters, a sortable
-table, refresh, row modal, and a **Run research** placeholder for your buy/sell
-or chat flow.
+Frontend uses:
 
-**Market movers (API, yfinance, ranking, caching):** see
-[`docs/MARKET_MOVERS.md`](docs/MARKET_MOVERS.md).
+NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000
 
-## Notes
+---
 
-- Market movers use **`yfinance`** as the default provider (see [`docs/MARKET_MOVERS.md`](docs/MARKET_MOVERS.md)).
-- Optional API keys for other providers (Finnhub, Alpha Vantage) are placeholders for future work.
-- Index universes are driven by `data/universes/*.csv`; regenerate them with
-  `python scripts/fetch_universes_polygon.py` when you need updated constituents.
+### 📊 Available Pages
+
+- /buy-sell
+- /market-movers
+- /fundamentals
+- /chatbot
+- /history
+- /login
+
+---

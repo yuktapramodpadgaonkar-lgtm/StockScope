@@ -14,11 +14,11 @@ const NAV_LINKS: { href: string; label: string }[] = [
 
 function linkClass(active: boolean): string {
   const base =
-    "rounded-lg px-3 py-2 text-sm font-medium transition focus-visible:outline focus-visible:ring-2 focus-visible:ring-emerald-500/50";
+    "rounded-lg px-3 py-2 text-sm font-medium transition focus-visible:outline focus-visible:ring-2 focus-visible:ring-teal-500/50";
   if (active) {
-    return `${base} bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/30`;
+    return `${base} bg-teal-100 text-teal-700 ring-1 ring-teal-400/50`;
   }
-  return `${base} text-slate-300 hover:bg-slate-800/80 hover:text-white`;
+  return `${base} text-gray-700 hover:bg-teal-100/80 hover:text-teal-800`;
 }
 
 function shortEmail(email: string): string {
@@ -41,13 +41,13 @@ export function Navbar() {
   }
 
   return (
-    <header className="sticky top-0 z-40 border-b border-slate-800/80 bg-slate-950/90 backdrop-blur">
+    <header className="sticky top-0 z-40 border-b border-gray-200/80 bg-white/90 backdrop-blur">
       <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
         <Link
           href="/"
-          className="text-sm font-semibold tracking-tight text-white hover:text-emerald-200/90"
+          className="text-sm font-semibold tracking-tight text-gray-900 hover:text-teal-700"
         >
-          StockScope
+          StockScope AI
         </Link>
         <div className="flex flex-wrap items-center justify-end gap-1 sm:gap-2">
           <nav className="flex flex-wrap items-center gap-1 sm:gap-2" aria-label="Main">
@@ -63,9 +63,9 @@ export function Navbar() {
             )}
           </nav>
           {user && (
-            <div className="flex items-center gap-2 border-l border-slate-800 pl-2 sm:pl-3">
+            <div className="flex items-center gap-2 border-l border-gray-200 pl-2 sm:pl-3">
               <span
-                className="hidden max-w-[160px] truncate text-xs text-slate-400 sm:inline"
+                className="hidden max-w-[160px] truncate text-xs text-gray-500 sm:inline"
                 title={user.email}
               >
                 {shortEmail(user.email)}
@@ -73,7 +73,7 @@ export function Navbar() {
               <button
                 type="button"
                 onClick={() => logout()}
-                className="rounded-lg px-3 py-2 text-sm font-medium text-slate-300 transition hover:bg-slate-800/80 hover:text-white"
+                className="rounded-lg px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-teal-100/80 hover:text-teal-800"
               >
                 Sign out
               </button>

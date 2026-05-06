@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from app.core.config import settings
 from app.schemas.market_movers import MarketMoversResponse, MoverType, TimeMode, Universe
 from app.services.market_data_provider import MarketDataProvider

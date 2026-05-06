@@ -1,0 +1,364 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://stockscope.local/schemas/buy_sell_report.json",
+  "title": "BuySellReport",
+  "description": "Kavout-style buy/sell analysis output contract — v1.2.0 (optional agent_pipeline + memory)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "ticker",
+    "recommendation",
+    "confidence",
+    "optimal_timeframe",
+    "setup_quality",
+    "investment_thesis",
+    "fundamental_analysis",
+    "technical_analysis",
+    "sentiment_analysis",
+    "final_verdict",
+    "scoring_engine",
+    "llm_review",
+    "risk_assessment",
+    "citations",
+    "disclaimer"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "enum": ["1.0.0", "1.1.0", "1.2.0"]
+    },
+    "ticker": { "type": "string", "minLength": 1 },
+    "recommendation": { "type": "string", "enum": ["BUY", "HOLD", "SELL"] },
+    "confidence": { "type": "integer", "minimum": 0, "maximum": 100 },
+    "optimal_timeframe": { "type": "string" },
+    "setup_quality": { "type": "integer", "minimum": 0, "maximum": 100 },
+    "disclaimer": { "type": "string" },
+    "investment_thesis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["summary", "key_drivers"],
+      "properties": {
+        "summary": { "type": "string" },
+        "key_drivers": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "fundamental_analysis": { "$ref": "#/$defs/fundamental_analysis" },
+    "technical_analysis": { "$ref": "#/$defs/technical_analysis" },
+    "sentiment_analysis": { "$ref": "#/$defs/sentiment_analysis" },
+    "scoring_engine": { "$ref": "#/$defs/scoring_engine" },
+    "llm_review": { "$ref": "#/$defs/llm_review" },
+    "final_verdict": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "overall_score",
+        "rating",
+        "why_dimensions_align",
+        "conflicts"
+      ],
+      "properties": {
+        "overall_score": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "rating": { "type": "string" },
+        "why_dimensions_align": { "type": "string" },
+        "conflicts": { "type": "string" }
+      }
+    },
+    "risk_assessment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key_risks", "action_plan"],
+      "properties": {
+        "key_risks": { "type": "array", "items": { "type": "string" } },
+        "action_plan": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["if_you_own", "if_you_want_to_buy"],
+          "properties": {
+            "if_you_own": { "type": "string" },
+            "if_you_want_to_buy": { "type": "string" }
+          }
+        }
+      }
+    },
+    "citations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/citation" }
+    },
+    "agent_pipeline": {
+      "anyOf": [
+        { "$ref": "#/$defs/buy_sell_agent_pipeline" },
+        { "type": "null" }
+      ]
+    },
+    "memory": {
+      "anyOf": [{ "$ref": "#/$defs/buy_sell_memory" }, { "type": "null" }]
+    }
+  },
+  "$defs": {
+    "citation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "source"],
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "source": { "type": "string" },
+        "url": { "type": ["string", "null"] },
+        "date": { "type": ["string", "null"] },
+        "snippet": { "type": ["string", "null"] }
+      }
+    },
+    "valuation_analysis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pe", "dcf_value", "current_price", "implied_upside"],
+      "properties": {
+        "pe": { "type": ["number", "null"] },
+        "dcf_value": { "type": ["number", "null"] },
+        "current_price": { "type": ["number", "null"] },
+        "implied_upside": { "type": ["number", "null"] }
+      }
+    },
+    "fundamental_analysis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "score",
+        "weight",
+        "business_performance",
+        "valuation_analysis",
+        "bull_bear_integration",
+        "verdict"
+      ],
+      "properties": {
+        "score": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "weight": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "business_performance": { "type": "string" },
+        "valuation_analysis": { "$ref": "#/$defs/valuation_analysis" },
+        "bull_bear_integration": { "type": "string" },
+        "verdict": { "type": "string" }
+      }
+    },
+    "technical_indicators": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rsi", "macd_signal", "ma_50", "ma_200", "price_vs_ma"],
+      "properties": {
+        "rsi": { "type": ["number", "null"] },
+        "macd_signal": { "type": "string" },
+        "ma_50": { "type": ["number", "null"] },
+        "ma_200": { "type": ["number", "null"] },
+        "price_vs_ma": { "type": "string" }
+      }
+    },
+    "technical_analysis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["score", "weight", "trend_analysis", "indicators", "verdict"],
+      "properties": {
+        "score": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "weight": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "trend_analysis": { "type": "string" },
+        "indicators": { "$ref": "#/$defs/technical_indicators" },
+        "verdict": { "type": "string" }
+      }
+    },
+    "sentiment_analysis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["score", "weight", "recent_developments", "verdict"],
+      "properties": {
+        "score": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "weight": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "recent_developments": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "verdict": { "type": "string" }
+      }
+    },
+    "score_signal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "value", "points", "reason"],
+      "properties": {
+        "name": { "type": "string" },
+        "value": { "type": ["number", "string", "null"] },
+        "points": { "type": "number" },
+        "reason": { "type": "string" }
+      }
+    },
+    "dimension_rule_score": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["score", "max_score", "signals", "data_completeness"],
+      "properties": {
+        "score": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "max_score": { "type": "integer" },
+        "signals": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/score_signal" }
+        },
+        "data_completeness": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "scoring_engine": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "weights", "rule_scores", "overall"],
+      "properties": {
+        "version": { "type": "string" },
+        "weights": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["fundamental", "technical", "sentiment"],
+          "properties": {
+            "fundamental": { "type": "integer" },
+            "technical": { "type": "integer" },
+            "sentiment": { "type": "integer" }
+          }
+        },
+        "rule_scores": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["fundamental", "technical", "sentiment"],
+          "properties": {
+            "fundamental": { "$ref": "#/$defs/dimension_rule_score" },
+            "technical": { "$ref": "#/$defs/dimension_rule_score" },
+            "sentiment": { "$ref": "#/$defs/dimension_rule_score" }
+          }
+        },
+        "overall": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["weighted_score", "recommendation", "band", "confidence", "setup_quality"],
+          "properties": {
+            "weighted_score": { "type": "number", "minimum": 0, "maximum": 100 },
+            "recommendation": { "type": "string", "enum": ["BUY", "HOLD", "SELL"] },
+            "band": { "type": "string" },
+            "confidence": { "type": "integer", "minimum": 0, "maximum": 100 },
+            "setup_quality": { "type": "integer", "minimum": 0, "maximum": 100 }
+          }
+        }
+      }
+    },
+    "llm_review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "model",
+        "llm_score_suggestion",
+        "agreement_with_rules",
+        "rationale",
+        "warnings",
+        "citations_used"
+      ],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "model": { "type": "string" },
+        "llm_score_suggestion": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["fundamental", "technical", "sentiment", "overall", "recommendation"],
+          "properties": {
+            "fundamental": { "type": "integer", "minimum": 0, "maximum": 100 },
+            "technical": { "type": "integer", "minimum": 0, "maximum": 100 },
+            "sentiment": { "type": "integer", "minimum": 0, "maximum": 100 },
+            "overall": { "type": "integer", "minimum": 0, "maximum": 100 },
+            "recommendation": { "type": "string", "enum": ["BUY", "HOLD", "SELL"] }
+          }
+        },
+        "agreement_with_rules": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["matches_recommendation", "overall_score_delta"],
+          "properties": {
+            "matches_recommendation": { "type": "boolean" },
+            "overall_score_delta": { "type": "integer" }
+          }
+        },
+        "rationale": { "type": "string" },
+        "warnings": { "type": "array", "items": { "type": "string" } },
+        "citations_used": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "planned_step_out": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "description"],
+      "properties": {
+        "id": { "type": "string" },
+        "description": { "type": "string" }
+      }
+    },
+    "pipeline_step_trace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["step_id", "description", "status", "duration_ms"],
+      "properties": {
+        "step_id": { "type": "string" },
+        "description": { "type": "string" },
+        "status": { "type": "string", "enum": ["ok", "skipped", "error"] },
+        "duration_ms": { "type": "number" },
+        "detail": { "type": ["string", "null"] }
+      }
+    },
+    "critic_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["passed", "incomplete_evidence", "flags", "notes"],
+      "properties": {
+        "passed": { "type": "boolean" },
+        "incomplete_evidence": { "type": "boolean" },
+        "flags": { "type": "array", "items": { "type": "string" } },
+        "notes": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "buy_sell_memory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "session_id",
+        "recent_tickers",
+        "preferred_horizon",
+        "analysis_style",
+        "session_summary",
+        "follow_up_context"
+      ],
+      "properties": {
+        "session_id": { "type": "string" },
+        "recent_tickers": { "type": "array", "items": { "type": "string" } },
+        "preferred_horizon": { "type": ["string", "null"] },
+        "analysis_style": { "type": ["string", "null"] },
+        "session_summary": { "type": "string" },
+        "follow_up_context": { "type": "string" }
+      }
+    },
+    "buy_sell_agent_pipeline": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "planner_version",
+        "plan_summary",
+        "planned_steps",
+        "execution_trace",
+        "critic"
+      ],
+      "properties": {
+        "planner_version": { "type": "string" },
+        "plan_summary": { "type": "string" },
+        "planned_steps": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/planned_step_out" }
+        },
+        "execution_trace": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/pipeline_step_trace" }
+        },
+        "critic": { "$ref": "#/$defs/critic_result" }
+      }
+    }
+  }
+}

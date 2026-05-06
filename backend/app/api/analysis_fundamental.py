@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
@@ -10,18 +12,17 @@ from app.services.fundamental_service import get_fundamental_report
 router = APIRouter(prefix="/api/analysis/fundamental", tags=["Fundamental Analysis"])
 
 LLM_UNAVAILABLE = "AI summary unavailable. Deterministic analysis is still provided."
+_bearer = HTTPBearer(auto_error=False)
 
 
 def _ai_error_message(llm_detail: str | None) -> str:
     detail = (llm_detail or "").strip()
     if not detail:
         return LLM_UNAVAILABLE
-    # Keep UI readable; full Gemini/Ollama hints help debug (model 404, bad key, etc.).
     cap = 320
     if len(detail) > cap:
         detail = detail[: cap - 1] + "…"
     return f"{LLM_UNAVAILABLE} ({detail})"
-_bearer = HTTPBearer(auto_error=False)
 
 
 def _require_bearer_email(creds: HTTPAuthorizationCredentials | None = Depends(_bearer)) -> str:

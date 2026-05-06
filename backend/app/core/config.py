@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from pathlib import Path
 
 from pydantic import AliasChoices, Field
@@ -15,6 +17,16 @@ class Settings(BaseSettings):
     market_data_provider: str = "yfinance"
     finnhub_api_key: str = ""
     alpha_vantage_api_key: str = ""
+    # Optional — advanced valuation / transcripts later (Layer 1 MVP does not call FMP).
+    fmp_api_key: str = ""
+    # Buy/Sell LLM review (Phase 4)
+    buysell_llm_provider: str = "none"  # none | huggingface
+    buysell_llm_enabled: bool = False
+    buysell_llm_model: str = ""  # e.g. FinGPT model id on Hugging Face
+    buysell_llm_timeout_seconds: int = 45
+    huggingface_api_token: str = ""
+    hf_model_id: str = ""
+    hf_inference_url: str = ""  # optional dedicated endpoint URL
 
     # Comma-separated origins for browser access to the API (Next.js dev server).
     cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
@@ -24,15 +36,49 @@ class Settings(BaseSettings):
     movers_cache_ttl_intraday_seconds: int = 60
     movers_cache_ttl_previous_day_seconds: int = 300
 
-    # Optional AI explanations (fundamental analysis). Loaded from backend/.env.
+    # Phase 5.1 — RAG retrieval (embeddings + store hygiene)
+    rag_embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
+    rag_embedding_batch_size: int = 16
+    rag_bm25_weight: float = 0.45
+    rag_embedding_weight: float = 0.55
+    rag_max_chunk_age_days: int = 730
+    rag_max_total_chunks: int = 80_000
+    rag_max_chunks_per_ticker: int = 600
+    rag_rotate_bytes: int = 100 * 1024 * 1024
+    sec_edgar_enabled: bool = True
+    sec_user_agent: str = ""
+    sec_filings_limit: int = 2
+    sec_filing_max_download_chars: int = 200_000
+    sec_cik_cache_hours: int = 168
+    sec_request_delay_seconds: float = 0.15
+
+    memory_enabled: bool = True
+    memory_max_recent_tickers: int = 30
+
+    eval_output_dir: str = ""
+
+    # Gemini (chat, news, fundamentals AI explanation) — use AI Studio key in .env
     gemini_api_key: str = Field(
         default="",
         validation_alias=AliasChoices("GEMINI_API_KEY", "gemini_api_key"),
     )
+    gemini_model: str = "gemini-1.5-flash"
+
     ollama_base_url: str = Field(
         default="http://localhost:11434",
         validation_alias=AliasChoices("OLLAMA_BASE_URL", "ollama_base_url"),
     )
+    ollama_llama_model: str = "llama3.1:8b"
+    ollama_mistral_model: str = "mistral:7b"
+
+    groq_api_key: str = ""
+    groq_model: str = "llama3-8b-8192"
+    openrouter_api_key: str = ""
+    openrouter_model: str = "mistralai/mistral-7b-instruct"
+    default_llm_provider: str = "gemini"  # gemini | llama | mistral
+
+    finbert_enabled: bool = True
+    finbert_model_id: str = "ProsusAI/finbert"
 
     model_config = SettingsConfigDict(
         env_file=str(_BACKEND_DIR / ".env"),

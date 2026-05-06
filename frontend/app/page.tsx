@@ -4,40 +4,40 @@ export default function Home() {
   return (
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col justify-center gap-8 px-6 py-16">
       <div>
-        <p className="text-sm font-medium uppercase tracking-widest text-emerald-400/90">
+        <p className="text-sm font-medium uppercase tracking-widest text-teal-800">
           StockScope AI
         </p>
-        <h1 className="mt-2 text-4xl font-semibold tracking-tight text-white">
-          CMPE-258 research platform
+        <h1 className="mt-2 text-4xl font-semibold tracking-tight text-gray-900">
+          Stock Research Platform
         </h1>
-        <p className="mt-4 text-lg text-slate-400">
-          Explore market movers, fundamentals, chat, and history—wired to a shared FastAPI
+        <p className="mt-4 text-lg text-gray-500">
+          Explore market movers, fundamentals, and history—use the chat button to open the AI assistant. Wired to a shared FastAPI
           backend. Use the links below to try each module; buy/sell and deeper AI features
           will layer in as the course project grows.
         </p>
       </div>
       <div className="flex flex-wrap gap-4">
         <Link
-          href="/market-movers"
-          className="rounded-lg bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-slate-950 shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-400"
+          href="/buy-sell"
+          className="rounded-lg bg-teal-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-teal-600/25 transition hover:bg-teal-700"
         >
-          Open Market Movers
+          Buy / Sell report
+        </Link>
+        <Link
+          href="/market-movers"
+          className="rounded-lg bg-teal-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-teal-600/25 transition hover:bg-teal-700"
+        >
+          Market Movers
         </Link>
         <Link
           href="/fundamentals"
-          className="rounded-lg border border-emerald-500/40 bg-emerald-950/30 px-5 py-2.5 text-sm font-semibold text-emerald-300 shadow-lg shadow-emerald-900/20 transition hover:border-emerald-400/60 hover:bg-emerald-950/50"
+          className="rounded-lg bg-teal-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-teal-600/25 transition hover:bg-teal-700"
         >
-          Fundamental analysis
-        </Link>
-        <Link
-          href="/chatbot"
-          className="rounded-lg border border-emerald-500/40 bg-emerald-950/30 px-5 py-2.5 text-sm font-semibold text-emerald-300 shadow-lg shadow-emerald-900/20 transition hover:border-emerald-400/60 hover:bg-emerald-950/50"
-        >
-          Chatbot
+          Fundamental Analysis
         </Link>
         <Link
           href="/history"
-          className="rounded-lg border border-emerald-500/40 bg-emerald-950/30 px-5 py-2.5 text-sm font-semibold text-emerald-300 shadow-lg shadow-emerald-900/20 transition hover:border-emerald-400/60 hover:bg-emerald-950/50"
+          className="rounded-lg bg-teal-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-teal-600/25 transition hover:bg-teal-700"
         >
           History
         </Link>
@@ -45,9 +45,9 @@ export default function Home() {
           href="http://127.0.0.1:8000/docs"
           target="_blank"
           rel="noreferrer"
-          className="rounded-lg border border-slate-700 bg-slate-900/80 px-5 py-2.5 text-sm font-medium text-slate-200 transition hover:border-slate-500"
+          className="rounded-lg bg-teal-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-teal-600/25 transition hover:bg-teal-700"
         >
-          API docs (Swagger)
+          API Docs
         </a>
       </div>
     </main>
