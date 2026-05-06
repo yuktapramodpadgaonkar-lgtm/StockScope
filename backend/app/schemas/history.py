@@ -16,6 +16,8 @@ class ResearchHistoryItem(BaseModel):
     type: str
     ticker: str
     created_at: str
+    model_used: str | None = None
+    provider: str | None = None
 
 
 class SavedPromptItem(BaseModel):
@@ -34,6 +36,10 @@ class ThreadMessage(BaseModel):
     role: str
     text: str
     timestamp: str
+    intent: str | None = None
+    model_used: str | None = None
+    provider: str | None = None
+    fallback_used: bool | None = None
 
 
 class ThreadHistoryResponse(BaseModel):

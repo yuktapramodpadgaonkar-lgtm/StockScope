@@ -55,3 +55,5 @@ class NewsSentimentResponse(BaseModel):
     disclaimer: str
     fallback_used: bool
     llm_model_used: str | None = None
+    llm_provider: str | None = None
+    llm_fallback_used: bool = False
