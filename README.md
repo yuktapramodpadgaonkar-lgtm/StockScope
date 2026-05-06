@@ -66,7 +66,7 @@ Fallback order (per request): Gemini → LLaMA → Mistral. All LLM calls are ha
 - Frontend: `/evaluation` — dropdown task selector, ticker input, side-by-side results table
 
 ### 7. Evaluation rubric harness
-- **`backend/evaluation/eval_set.json`** — **75** cases (fundamental, buy/sell, news, chat, market movers, safety, auth, citations, memory, multi-model, **agentic RAG** `rub-061`–`rub-075`)
+- **`backend/evaluation/eval_set.json`** — **89** cases (fundamental, buy/sell, news, chat, market movers, safety, auth, citations, memory, multi-model incl. `rub-087`–`rub-089`, **agentic chat** `rub-084`–`rub-086`, **agentic RAG** `rub-061`–`rub-075`)
 - **`backend/evaluation/run_batch_eval.py`** — batch runner with optional `--live-fundamental`, `--live-news`, `--live-market-data`, `--live-orchestrator`, `--live-multi`; writes CSV/JSON under `backend/evaluation/results/` (gitignored)
 - **`backend/evaluation/run_eval.py`** — buy/sell agent pipeline smoke eval (yfinance; subsets via `--max-cases`)
 - **Structured logs** — append-only `backend/logs/model_calls.jsonl` and `backend/logs/tool_calls.jsonl` (gitignored)
@@ -77,6 +77,7 @@ Fallback order (per request): Gemini → LLaMA → Mistral. All LLM calls are ha
 
 ```bash
 python backend/evaluation/run_batch_eval.py
+python backend/evaluation/run_batch_eval.py --category agentic_chat --live-chat
 python backend/evaluation/run_batch_eval.py --category agentic_rag --live-agentic
 ```
 

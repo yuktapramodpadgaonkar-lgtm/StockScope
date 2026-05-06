@@ -1,0 +1,27 @@
+{
+  "description": "JSON chat answers: answer + three bullets + disclaimer (stock, sentiment, comparison, general).",
+  "shots": [
+    {
+      "label": "Evidence-grounded movement explanation",
+      "json_output": {
+        "answer": "Recent items in the provided news context mention operational updates and sector chatter; the sentiment mix is tilted but not extreme. This is a coarse explanation only.",
+        "bullets": [
+          "Narrative themes in the supplied headlines skew slightly positive.",
+          "No single headline should drive a decision without verification.",
+          "Liquidity and broader market conditions also matter."
+        ]
+      }
+    },
+    {
+      "label": "Refusal pattern for direct advice (tone only)",
+      "json_output": {
+        "answer": "I can't tell you whether to buy or sell. I can outline educational factors people often review: fundamentals, risks, and news flow—all uncertain.",
+        "bullets": [
+          "Personalized trade instructions are out of scope.",
+          "Use multiple sources before any decision.",
+          "Past performance does not guarantee future results."
+        ]
+      }
+    }
+  ]
+}

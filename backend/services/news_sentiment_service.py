@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from datetime import date, datetime, timedelta
 from typing import Any
 
@@ -27,13 +28,14 @@ from app.schemas.news_sentiment import (
     SentimentLabel,
 )
 from services.ai.llm_service import LLMService
-from services.ai.prompts import build_news_themes_prompt
+from services.ai.prompts import build_news_themes_prompt, build_news_themes_repair_prompt
 from services.history_service import save_research_run
 
 logger = logging.getLogger(__name__)
 
 _DISCLAIMER = "This is for educational purposes only and not financial advice."
 _llm = LLMService()
+_NEWS_CLAIM_RE = re.compile(r"\b(headlines?|articles?|reported|according to)\b", re.IGNORECASE)
 
 # ── Date helpers ──────────────────────────────────────────────────────────────
 
@@ -263,6 +265,35 @@ def _generate_themes_and_summary(
     except (json.JSONDecodeError, ValueError):
         themes = _FALLBACK_THEMES
         summary = _build_fallback_summary(ticker, enriched_articles)
+
+    has_citations = any((a.get("url") or "").strip().startswith("http") for a in enriched_articles)
+    if (not has_citations) and _NEWS_CLAIM_RE.search(summary or ""):
+        # Critic: summary claims news specifics without citations. Attempt a single repair; then fallback.
+        repair_prompt = build_news_themes_repair_prompt(
+            ticker=ticker,
+            headlines=headlines_text,
+            previous=result.response or "",
+            problem="news_claim_without_citations",
+            has_citations=False,
+        )
+        repair = _llm.generate_response(repair_prompt, preferred_model=preferred_model)
+        if not repair.error and repair.response:
+            raw2 = repair.response.strip()
+            if raw2.startswith("```"):
+                raw2 = raw2.split("```")[1]
+                if raw2.startswith("json"):
+                    raw2 = raw2[4:]
+            s2, e2 = raw2.find("{"), raw2.rfind("}")
+            if s2 != -1 and e2 > s2:
+                raw2 = raw2[s2 : e2 + 1]
+            try:
+                parsed2 = json.loads(raw2)
+                themes = [str(t) for t in parsed2.get("themes", [])[:3]] or themes
+                summary = str(parsed2.get("summary", "")).strip() or summary
+            except (json.JSONDecodeError, ValueError):
+                summary = _build_fallback_summary(ticker, enriched_articles)
+        else:
+            summary = _build_fallback_summary(ticker, enriched_articles)
 
     return themes, summary, result.model_used, result.provider, result.fallback_used
 

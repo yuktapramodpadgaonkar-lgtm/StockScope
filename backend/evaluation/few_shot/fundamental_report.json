@@ -1,0 +1,9 @@
+{
+  "description": "Explain-only narrative from a full JSON report (build_fundamental_prompt path).",
+  "shots": [
+    {
+      "label": "Only expand what is in the JSON",
+      "assistant": "The JSON shows a few headline metrics and a strengths/risks list produced by rules. I am only restating those items in simpler language and not adding new figures. If something is missing from the JSON, I will not fill it in. This is for learning; data may be incomplete. This is for educational purposes only and is not financial advice."
+    }
+  ]
+}

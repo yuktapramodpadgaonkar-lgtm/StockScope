@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import json
+import re
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.schemas.fundamental import FundamentalAnalysisResponse
-from app.services.ai.fundamental_prompt import build_fundamental_prompt
+from app.services.ai.fundamental_prompt import build_fundamental_prompt, build_fundamental_repair_prompt
 from app.services.auth_service import verify_access_token
 from app.services.fundamental_service import get_fundamental_report
 from services.ai.llm_service import LLMService
@@ -14,6 +17,7 @@ router = APIRouter(prefix="/api/analysis/fundamental", tags=["Fundamental Analys
 LLM_UNAVAILABLE = "AI summary unavailable. Deterministic analysis is still provided."
 _bearer = HTTPBearer(auto_error=False)
 _llm = LLMService()
+_NUM_RE = re.compile(r"\b\d+(?:\.\d+)?\b")
 
 
 def _ai_error_message(llm_detail: str | None) -> str:
@@ -24,6 +28,34 @@ def _ai_error_message(llm_detail: str | None) -> str:
     if len(detail) > cap:
         detail = detail[: cap - 1] + "…"
     return f"{LLM_UNAVAILABLE} ({detail})"
+
+
+def _significant_numbers(text: str) -> list[str]:
+    out: list[str] = []
+    for m in _NUM_RE.finditer(text or ""):
+        s = m.group(0)
+        if "." in s:
+            out.append(s)
+            continue
+        try:
+            n = int(s)
+        except ValueError:
+            continue
+        # ignore likely years and tiny integers
+        if 1990 <= n <= 2035:
+            continue
+        if n < 10:
+            continue
+        out.append(s)
+    return out
+
+
+def _fundamental_summary_needs_repair(summary: str, report: dict) -> bool:
+    corpus = json.dumps(report, ensure_ascii=False)
+    for num in _significant_numbers(summary):
+        if num not in corpus:
+            return True
+    return False
 
 
 def _require_bearer_email(creds: HTTPAuthorizationCredentials | None = Depends(_bearer)) -> str:
@@ -68,6 +100,18 @@ def get_fundamental_analysis(
         else:
             ai_summary = llm_result.response
             ai_model = llm_result.model_used
+            if isinstance(ai_summary, str) and ai_summary.strip() and _fundamental_summary_needs_repair(ai_summary, data):
+                repair_prompt = build_fundamental_repair_prompt(
+                    report=data,
+                    previous_text=ai_summary,
+                    problem="numeric_claim_not_in_deterministic_report",
+                )
+                repair_result = _llm.generate_response(repair_prompt, preferred_model=preferred_model)
+                if not repair_result.error and repair_result.response:
+                    ai_summary = repair_result.response.strip()
+                    ai_model = repair_result.model_used
+                else:
+                    ai_error = _ai_error_message("AI summary contained unsupported numeric claims; repair failed")
 
     payload = {
         **data,

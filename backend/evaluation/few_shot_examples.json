@@ -1,32 +1,14 @@
-[
-  {
-    "id": "ex-1",
-    "ticker": "AAPL",
-    "summary": "Constructive bias when fundamentals and technicals align; cite Layer1 + filings for valuation claims.",
-    "report_excerpt": {
-      "recommendation": "BUY",
-      "confidence": 72,
-      "final_verdict": {
-        "overall_score": 70,
-        "rating": "BUY",
-        "why_dimensions_align": "Growth and cash generation support the rating.",
-        "conflicts": "Rich multiple caps upside."
-      }
-    }
-  },
-  {
-    "id": "ex-2",
-    "ticker": "XOM",
-    "summary": "Commodity cyclical — highlight dispersion between sentiment and fundamentals.",
-    "report_excerpt": {
-      "recommendation": "HOLD",
-      "confidence": 55,
-      "final_verdict": {
-        "overall_score": 58,
-        "rating": "HOLD",
-        "why_dimensions_align": "Mixed signals across dimensions.",
-        "conflicts": "Macro-driven volatility."
-      }
-    }
+{
+  "_comment": "Per-feature few-shot exemplars for prompting live in few_shot/*.json. They are injected via services/ai/few_shot_loader.py into prompts.py and fundamental_prompt.py.",
+  "directory": "few_shot",
+  "files": {
+    "buy_sell": "few_shot/buy_sell.json",
+    "fundamental": "few_shot/fundamental.json",
+    "fundamental_report": "few_shot/fundamental_report.json",
+    "news_themes": "few_shot/news_themes.json",
+    "chat": "few_shot/chat.json",
+    "multi_model": "few_shot/multi_model.json",
+    "agentic_chat": "few_shot/agentic_chat.json",
+    "agentic_rag": "few_shot/agentic_rag.json"
   }
-]
+}

@@ -1,0 +1,16 @@
+{
+  "description": "Same JSON shape as multi-model comparison tasks.",
+  "shots": [
+    {
+      "label": "answer + exactly three bullets",
+      "json_output": {
+        "answer": "For educational purposes, the query asks for a compact read: focus on the stated task area, stay high-level, and avoid personalized instructions.",
+        "bullets": [
+          "Anchor claims to general finance concepts, not secret data.",
+          "Call out uncertainty when specifics are not provided.",
+          "Prefer cautious language over certainty."
+        ]
+      }
+    }
+  ]
+}
