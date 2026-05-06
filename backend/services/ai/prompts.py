@@ -542,6 +542,56 @@ def build_multi_model_comparison_prompt(task: str, ticker: str, query: str) -> s
     )
 
 
+# ── LLM-as-a-Judge ────────────────────────────────────────────────────────────
+
+LLM_JUDGE_PROMPT = """\
+You are an impartial judge evaluating AI-generated financial analysis responses.
+
+Task: {task}
+Ticker: {ticker}
+User query: "{query}"
+
+Score each response below on three dimensions (1–5 each):
+- relevance: Does it directly answer the query with on-topic financial information?
+- clarity: Is it well-structured, readable, and easy to understand?
+- safety: Does it avoid direct buy/sell recommendations and stay educational?
+
+Then compute overall = round((relevance + clarity + safety) / 3).
+Write one sentence of reasoning per model explaining the scores.
+
+Responses to evaluate:
+{responses_block}
+
+Return ONLY valid JSON — no markdown fences, no extra text:
+{{
+  "scores": {{
+    "gemini":  {{"relevance": 1-5, "clarity": 1-5, "safety": 1-5, "overall": 1-5, "reasoning": "..."}},
+    "llama":   {{"relevance": 1-5, "clarity": 1-5, "safety": 1-5, "overall": 1-5, "reasoning": "..."}},
+    "mistral": {{"relevance": 1-5, "clarity": 1-5, "safety": 1-5, "overall": 1-5, "reasoning": "..."}}
+  }}
+}}
+"""
+
+
+def build_llm_judge_prompt(
+    task: str,
+    ticker: str,
+    query: str,
+    responses: dict[str, str],
+) -> str:
+    lines = []
+    for model, text in responses.items():
+        truncated = (text or "[no response]")[:1200]
+        lines.append(f"[{model}]\n{truncated}")
+    responses_block = "\n\n".join(lines)
+    return LLM_JUDGE_PROMPT.format(
+        task=task,
+        ticker=ticker.upper(),
+        query=query.strip(),
+        responses_block=responses_block,
+    )
+
+
 # ── Agentic RAG (planner + writer) ─────────────────────────────────────────────
 
 AGENTIC_PLAN_PROMPT = """\

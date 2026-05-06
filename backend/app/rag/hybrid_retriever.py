@@ -104,7 +104,23 @@ def retrieve_chunks(
     ]
 
     if not rows:
-        return []
+        return [
+            {
+                "chunk_id": f"fallback_{sym}",
+                "ticker": sym,
+                "doc_type": "fallback",
+                "title": f"No indexed documents for {sym}",
+                "text": (
+                    f"No pre-indexed documents are available for {sym} in the local knowledge base. "
+                    "This response is based on general knowledge only. "
+                    "To add documents, place .txt or .json files in backend/data/documents/ "
+                    "and run: python backend/scripts/ingest_documents.py"
+                ),
+                "retrieval_score": 0.0,
+                "retrieval_bm25": 0.0,
+                "retrieval_cosine": None,
+            }
+        ]
 
     doc_tokens = [_tokens(str(r.get("text") or "")) for r in rows]
     q_tokens = _tokens(query)

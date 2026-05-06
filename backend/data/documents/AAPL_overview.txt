@@ -1,0 +1,31 @@
+Apple Inc. (AAPL) — Company Overview
+
+Apple Inc. designs, manufactures, and markets smartphones, personal computers, tablets, wearables, and accessories worldwide. Its flagship products include the iPhone, Mac, iPad, Apple Watch, and AirPods. The company also operates a Services segment generating revenue from the App Store, Apple Music, iCloud, Apple Pay, and AppleCare.
+
+Financial highlights (FY2024):
+- Revenue: ~$391 billion
+- Net income: ~$94 billion
+- Gross margin: ~46%
+- Operating margin: ~31%
+- EPS (diluted): ~$6.11
+- P/E ratio: approximately 30x trailing earnings
+
+Growth drivers:
+- Services segment growing at double-digit rates, now exceeding $90 billion annually
+- iPhone 15 Pro and iPhone 16 series driving upgrade cycles
+- Expansion of Apple Intelligence (on-device AI features)
+- India manufacturing ramp-up reducing geopolitical supply risk
+
+Key risks:
+- China revenue concentration (~18% of total revenue); tariff and regulatory exposure
+- Smartphone market saturation in developed markets
+- Antitrust regulatory pressure on App Store commissions (EU Digital Markets Act)
+- Dependence on TSMC for advanced chip manufacturing
+
+Recent news themes:
+- Apple Intelligence rollout accelerating across iPhone, Mac, and iPad
+- EU compliance changes for App Store in Europe
+- Record share buyback program continuing
+- Supply chain diversification to India and Vietnam
+
+This document is for educational purposes only and is not financial advice.

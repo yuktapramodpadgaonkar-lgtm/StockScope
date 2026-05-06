@@ -54,6 +54,19 @@ export function ChatMessage({ message }: ChatMessageProps) {
           {payload.disclaimer ? (
             <p className="mt-2 text-[10px] leading-snug text-slate-400">{payload.disclaimer}</p>
           ) : null}
+          {payload.llm_model_used ? (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              <span className="inline-flex items-center rounded-full border border-teal-200 bg-teal-50 px-2 py-0.5 text-[10px] font-semibold text-teal-700">
+                {payload.llm_fallback_used ? "Fallback: " : "Answered by "}
+                {payload.llm_model_used}
+              </span>
+              {payload.llm_provider ? (
+                <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-medium text-slate-500">
+                  {payload.llm_provider}
+                </span>
+              ) : null}
+            </div>
+          ) : null}
         </div>
         <p className="pl-1 text-[10px] text-slate-500">{formatMessageTime(at)}</p>
       </div>

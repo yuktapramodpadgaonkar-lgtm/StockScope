@@ -11,6 +11,7 @@ const NAV_LINKS: { href: string; label: string }[] = [
   { href: "/market-movers", label: "Market movers" },
   { href: "/fundamentals", label: "Fundamentals" },
   { href: "/agentic-research", label: "Agentic research" },
+  { href: "/evaluation", label: "Model eval" },
 ];
 
 function linkClass(active: boolean): string {

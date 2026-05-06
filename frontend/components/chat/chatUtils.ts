@@ -14,6 +14,9 @@ export function buildAssistantPayloadFromHistoryText(
     citations: [],
     disclaimer: "",
     timestamp,
+    llm_model_used: null,
+    llm_provider: null,
+    llm_fallback_used: false,
   };
 }
 

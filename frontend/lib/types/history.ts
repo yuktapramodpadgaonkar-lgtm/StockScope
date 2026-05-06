@@ -9,6 +9,8 @@ export type ResearchHistoryItem = {
   type: string;
   ticker: string;
   created_at: string;
+  model_used: string | null;
+  provider: string | null;
 };
 
 export type SavedPromptItem = {
@@ -27,6 +29,10 @@ export type ThreadMessage = {
   role: string;
   text: string;
   timestamp: string;
+  intent: string | null;
+  model_used: string | null;
+  provider: string | null;
+  fallback_used: boolean | null;
 };
 
 export type ThreadHistoryResponse = {

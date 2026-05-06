@@ -63,6 +63,7 @@ Fallback order (per request): Gemini → LLaMA → Mistral. All LLM calls are ha
 - `POST /api/evaluation/compare-models`
 - Runs the same prompt through Gemini, LLaMA, and Mistral independently
 - Returns latency, citation count, and safety status per model
+- Frontend: `/evaluation` — dropdown task selector, ticker input, side-by-side results table
 
 ### 7. Evaluation rubric harness
 - **`backend/evaluation/eval_set.json`** — **89** cases (fundamental, buy/sell, news, chat, market movers, safety, auth, citations, memory, multi-model incl. `rub-087`–`rub-089`, **agentic chat** `rub-084`–`rub-086`, **agentic RAG** `rub-061`–`rub-075`)
@@ -83,6 +84,13 @@ python backend/evaluation/run_batch_eval.py --category agentic_rag --live-agenti
 ### 8. History
 - Persisted chat threads, research runs, saved prompts
 - Records model_used, provider, intent, fallback_used per interaction
+- UI displays model badges ("Answered by Gemini", "Fallback: LLaMA") on chat messages and research runs
+
+### 9. RAG / Document grounding
+- Place `.txt` or `.json` files in `backend/data/documents/` named `<TICKER>_description.txt`
+- Run `python backend/scripts/ingest_documents.py` to index them into the RAG store
+- Pre-loaded demo documents: AAPL, NVDA, MSFT, TSLA, GOOGL
+- Retriever returns an explicit fallback message when no documents exist (never silent empty)
 
 ---
 
@@ -253,8 +261,12 @@ Frontend (Next.js + TypeScript + Tailwind)
 | `/market-movers` | Top gainers and losers |
 | `/fundamentals` | Fundamental analysis |
 | `/chatbot` | AI chatbot |
-| `/history` | Research and chat history |
+| `/history` | Research and chat history (with model metadata) |
+| `/agentic-research` | Agentic RAG research pipeline |
+| `/evaluation` | Multi-model comparison (Gemini / LLaMA / Mistral) |
 | `/login` | Authentication |
+
+> **Note:** Authentication is mocked for demo purposes. Any email/password is accepted and a session token is issued. No real user database or JWT signing is used.
 
 ---
 
