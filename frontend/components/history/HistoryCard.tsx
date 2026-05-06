@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 
 import { fetchThreadHistory } from "@/lib/revati-api";
+import type { ThreadMessage } from "@/lib/revati-types";
 
 import type { UnifiedHistoryItem } from "@/components/history/historyUtils";
 import {
@@ -42,7 +43,7 @@ export function HistoryCard({ item }: HistoryCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [threadLoading, setThreadLoading] = useState(false);
   const [threadError, setThreadError] = useState<string | null>(null);
-  const [messages, setMessages] = useState<{ role: string; text: string; timestamp: string }[] | null>(null);
+  const [messages, setMessages] = useState<ThreadMessage[] | null>(null);
 
   const title = useMemo(() => {
     if (item.kind === "chat") return item.data.title || "Chat thread";
@@ -84,17 +85,29 @@ export function HistoryCard({ item }: HistoryCardProps) {
       return item.data.prompt_text;
     }
     if (item.kind === "research") {
-      return [
+      const lines = [
         `Type: ${item.data.type}`,
         `Ticker: ${item.data.ticker}`,
         `Run at: ${formatHistoryTimestamp(item.data.created_at)}`,
-      ].join("\n");
+      ];
+      if (item.data.model_used) lines.push(`Model: ${item.data.model_used}`);
+      if (item.data.provider) lines.push(`Provider: ${item.data.provider}`);
+      return lines.join("\n");
     }
     if (item.kind === "chat") {
       if (threadLoading) return "";
       if (threadError) return threadError;
       if (!messages?.length) return "No messages in this thread yet.";
-      return messages.map((m) => `[${m.role}] ${m.text}`).join("\n\n");
+      return messages
+        .map((m) => {
+          let line = `[${m.role}] ${m.text}`;
+          if (m.role === "assistant" && m.model_used) {
+            const fallbackNote = m.fallback_used ? " (fallback)" : "";
+            line += `\n  ↳ ${m.model_used}${fallbackNote}${m.provider ? ` · ${m.provider}` : ""}`;
+          }
+          return line;
+        })
+        .join("\n\n");
     }
     return "";
   }, [item, messages, threadError, threadLoading]);
@@ -121,6 +134,11 @@ export function HistoryCard({ item }: HistoryCardProps) {
             {ticker ? (
               <span className="rounded-lg bg-slate-100 px-2 py-0.5 font-mono text-xs font-semibold text-slate-700">
                 {ticker}
+              </span>
+            ) : null}
+            {item.kind === "research" && item.data.model_used ? (
+              <span className="inline-flex items-center rounded-full border border-teal-200 bg-teal-50 px-2 py-0.5 text-[10px] font-semibold text-teal-700">
+                {item.data.model_used}
               </span>
             ) : null}
           </div>

@@ -30,6 +30,9 @@ function normalizeChatQueryResponse(raw: unknown): ChatQueryResponse {
     }),
     disclaimer: String(r.disclaimer ?? ""),
     timestamp: String(r.timestamp ?? new Date().toISOString()),
+    llm_model_used: r.llm_model_used != null ? String(r.llm_model_used) : null,
+    llm_provider: r.llm_provider != null ? String(r.llm_provider) : null,
+    llm_fallback_used: Boolean(r.llm_fallback_used),
   };
 }
 

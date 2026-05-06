@@ -1,0 +1,32 @@
+Microsoft Corporation (MSFT) — Company Overview
+
+Microsoft Corporation develops, licenses, and supports software, services, devices, and solutions worldwide. Its three segments are Productivity and Business Processes (Office, Teams, LinkedIn), Intelligent Cloud (Azure, SQL Server, GitHub), and More Personal Computing (Windows, Xbox, Surface).
+
+Financial highlights (FY2024):
+- Revenue: ~$245 billion
+- Net income: ~$88 billion
+- Gross margin: ~70%
+- Operating margin: ~45%
+- Azure cloud revenue growth: ~31% year-over-year
+- EPS (diluted): ~$11.80
+
+Growth drivers:
+- Azure AI services and OpenAI partnership driving cloud adoption
+- Copilot integration across Microsoft 365, GitHub, and Azure
+- Gaming segment growth from Activision Blizzard acquisition
+- LinkedIn revenue growing through premium subscriptions and hiring solutions
+- Enterprise AI adoption accelerating via Copilot for Microsoft 365
+
+Key risks:
+- EU and US antitrust scrutiny of OpenAI investment and cloud market share
+- Bing AI/Copilot monetization ramp slower than expected
+- Continued competition from AWS and Google Cloud in enterprise cloud
+- Activision integration costs and impairment risk
+
+Recent news themes:
+- Copilot AI assistant usage surpassing 100 million monthly active users
+- Azure OpenAI Service becoming default enterprise AI platform
+- GitHub Copilot expanding from code completion to agentic coding workflows
+- Microsoft data center investment exceeding $50B annually for AI infrastructure
+
+This document is for educational purposes only and is not financial advice.

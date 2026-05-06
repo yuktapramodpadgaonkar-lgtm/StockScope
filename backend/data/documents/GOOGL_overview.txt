@@ -1,0 +1,32 @@
+Alphabet Inc. (GOOGL) — Company Overview
+
+Alphabet Inc. is the parent company of Google LLC and several former subsidiaries. Its core business is Google Services (Search, YouTube, Gmail, Maps, Chrome, Play), alongside Google Cloud and Other Bets (Waymo, DeepMind, Verily). Google generates the majority of revenue through advertising on Search and YouTube.
+
+Financial highlights (FY2024):
+- Revenue: ~$350 billion
+- Net income: ~$100 billion
+- Google Cloud revenue: ~$44 billion (growing ~28% YoY)
+- YouTube advertising: ~$35 billion annually
+- Operating margin: ~32%
+- EPS (diluted): ~$8.04
+
+Growth drivers:
+- Google Cloud accelerating as enterprises adopt AI services (Gemini, Vertex AI)
+- Search revenue resilient despite AI Overviews integration
+- YouTube Shorts monetization improving toward parity with long-form video
+- Waymo robotaxi expanding to new cities with strong safety record
+- DeepMind's Gemini models underpinning cross-product AI improvements
+
+Key risks:
+- US Department of Justice antitrust case targeting Google Search distribution agreements
+- AI Overviews potentially reducing click-through to advertisers (long-term search monetization risk)
+- Competition from Microsoft Bing AI + OpenAI ChatGPT for search market share
+- Regulatory pressure in EU on advertising practices and data privacy
+
+Recent news themes:
+- Gemini 2.0 model family outperforming competitors on key benchmarks
+- DOJ antitrust ruling requiring changes to search distribution deals
+- Google Cloud gaining market share from AWS in AI workloads
+- YouTube Shorts ad revenue approaching TV-scale monetization
+
+This document is for educational purposes only and is not financial advice.

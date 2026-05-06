@@ -1,0 +1,32 @@
+NVIDIA Corporation (NVDA) — Company Overview
+
+NVIDIA Corporation designs and markets graphics processing units (GPUs), system-on-chip units, and related software. It operates in two segments: Graphics and Compute & Networking. The company is the dominant supplier of AI training and inference chips through its H100 and B100/B200 Blackwell GPU families.
+
+Financial highlights (FY2025):
+- Revenue: ~$130 billion (full-year)
+- Data Center revenue: ~$115 billion (fastest-growing segment)
+- Net income: ~$72 billion
+- Gross margin: ~75%
+- Operating margin: ~60%
+- EPS (diluted): ~$2.94 (adjusted)
+
+Growth drivers:
+- Explosive demand for AI training infrastructure from hyperscalers (Microsoft, Google, Amazon, Meta)
+- Blackwell GPU architecture ramping to meet record backlog
+- CUDA software ecosystem creating strong switching costs
+- Networking (InfiniBand/Ethernet) segment growing alongside compute
+- Sovereign AI: national governments building domestic AI infrastructure
+
+Key risks:
+- US export controls on advanced chips to China (~$15B potential revenue risk)
+- AMD and Intel competing in AI accelerator market
+- Customer concentration: top 5 hyperscaler customers represent majority of Data Center revenue
+- Cyclical semiconductor industry; inventory corrections possible
+
+Recent news themes:
+- Blackwell GPU production ramp beating expectations
+- US government tightening export control rules on H20 chip to China
+- NVIDIA expanding into AI agents and robotics with Isaac platform
+- Partnerships with major cloud providers for dedicated GPU clusters
+
+This document is for educational purposes only and is not financial advice.
