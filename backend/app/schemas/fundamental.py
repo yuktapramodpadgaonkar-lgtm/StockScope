@@ -28,3 +28,6 @@ class FundamentalAnalysisResponse(BaseModel):
     risks: list[str]
     verdict: str
     disclaimer: str
+    llm_summary: str | None = None
+    llm_model_used: str | None = None
+    llm_provider: str | None = None

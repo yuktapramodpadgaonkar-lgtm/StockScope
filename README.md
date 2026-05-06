@@ -1,309 +1,236 @@
-# 📌 StockScope — AI-Powered Stock Research Platform
+# StockScope — AI-Powered Stock Research Platform
 
-## 👥 Team Members
-- Yukta Pramod Padgaonkar  
-- Ramya Gopalaswamy  
-- Revati Dharmadhikari  
-
----
-
-## 📊 Project Overview
-
-StockScope is a **vertical AI-powered stock research platform** designed to provide structured, explainable, and data-driven insights for retail investors.
-
-The system integrates:
-- market data
-- financial fundamentals
-- news sentiment
-- conversational AI
-
-into a unified interface for stock analysis and decision support.
+## Team Members
+- Yukta Pramod Padgaonkar
+- Ramya Gopalaswamy
+- Revati Dharmadhikari
 
 ---
 
-## 🎯 Problem Statement
+## Project Overview
 
-Retail investors rely on fragmented tools such as:
-- price charts
-- news feeds
-- financial reports
+StockScope is a vertical AI-powered stock research platform providing structured, explainable, and data-driven insights for retail investors.
 
-These tools:
-- lack integration
-- provide unstructured insights
-- do not explain reasoning clearly
-
-StockScope addresses this by building an **evaluation-driven AI system** that combines deterministic analytics with AI-based reasoning.
+The system integrates market data, financial fundamentals, news sentiment, and conversational AI into a unified interface.
 
 ---
 
-## 🧠 Core Features
+## AI Models
+
+| Role | Model | Provider |
+|------|-------|----------|
+| Primary LLM | Gemini 1.5 Flash | Google AI REST API |
+| Local fallback 1 | LLaMA 3.1 8B | Ollama (local) |
+| Local fallback 2 | Mistral 7B | Ollama (local) |
+| Sentiment | FinBERT (ProsusAI/finbert) | HuggingFace Inference API |
+
+Fallback order (per request): Gemini → LLaMA → Mistral. All LLM calls are handled by `backend/services/ai/llm_service.py`.
+
+---
+
+## Core Features
 
 ### 1. Market Movers
-- Displays top gainers and losers
-- Shows price, percentage change, and volume
-- Interactive table UI for quick exploration
-- Market movers (API, yfinance, ranking, caching): see docs/MARKET_MOVERS.md.
----
+- Top gainers and losers from yfinance
+- Price, percentage change, volume
+- Intraday + previous-day cache
 
-### 2. Buy/Sell Analysis (Phase 1 + Layer 1)
-- Kavout-style structured report schema for BUY/HOLD/SELL outputs
-- Mock report API + UI page for contract testing
-- Layer 1 data bundle API with provider call ledger
-- Local technical computation (RSI/MACD/MAs) from one shared history fetch
-- Buy/sell roadmap and source strategy docs:
-  - `docs/BuySellAnalysis-roadmap.md`
-  - `docs/BuySellAnalysis-data-sources.md`
-  - `docs/Layer1-api-call-ledger.md`
-
----
+### 2. Buy/Sell Analysis
+- Deterministic scoring: fundamentals (40%) + technicals (30%) + sentiment (30%)
+- BUY / HOLD / SELL with confidence score
+- LLM narrative explanation of the deterministic score (Gemini → LLaMA → Mistral)
+- Agent pipeline: Planner–Executor–Critic
+- RAG citations from news and SEC filings
 
 ### 3. Fundamental Analysis
-- Extracts financial metrics (P/E, ROE, margins, growth)
-- Applies rule-based evaluation for financial health
-- Generates structured report including:
-  - strengths
-  - risks
-  - overall verdict
-
----
+- yfinance metrics: P/E, ROE, margins, debt/equity, growth
+- Rule-based health verdict (strengths + risks)
+- LLM plain-English explanation of the rule-based output
 
 ### 4. News Sentiment Analysis
-- Retrieves recent news for a ticker
-- Aggregates sentiment signals
-- Identifies major themes affecting stock movement
-
----
+- Finnhub news fetch (falls back to mock data when key absent)
+- FinBERT classification per article (keyword heuristic fallback)
+- LLM theme extraction and narrative summary
+- Citations for all articles
 
 ### 5. Chatbot
-- Natural language stock queries
-- Planned agent-based reasoning system
+- Intent detection: stock_explanation, sentiment_question, comparison_question, history_lookup, unknown
+- Safety layer rejects direct buy/sell advice
+- LLM grounded responses with news context
+- Persistent thread history
+
+### 6. Multi-Model Comparison
+- `POST /api/evaluation/compare-models`
+- Runs the same prompt through Gemini, LLaMA, and Mistral independently
+- Returns latency, citation count, and safety status per model
+
+### 7. History
+- Persisted chat threads, research runs, saved prompts
+- Records model_used, provider, intent, fallback_used per interaction
 
 ---
 
-### 6. History & Memory (In Progress)
-- Stores chat history
-- Tracks previous research queries
-- Planned long-horizon memory
+## Data Sources
+
+| Source | Usage |
+|--------|-------|
+| yfinance | Prices, fundamentals, technicals, fallback news |
+| Finnhub | Company news (optional API key) |
+| Alpha Vantage | News + sentiment feed (optional API key) |
+| HuggingFace Inference API | FinBERT sentiment (optional token) |
+| SEC EDGAR | Filings ingestion for RAG (optional) |
 
 ---
 
+## Setup
 
-## 🗂️ Data Sources
-
-- **yfinance**
-  - stock prices / historical candles
-  - fundamentals and company profile fields
-  - fallback news headlines when Alpha Vantage is not configured
-
-- **Alpha Vantage (implemented, optional via API key)**
-  - `NEWS_SENTIMENT` feed for ticker news + sentiment metadata
-
-- **Finnhub (implemented, optional via API key)**
-  - analyst recommendation trend data (`/stock/recommendation`)
-
-- **Polygon.io (implemented for scripts, not runtime API)**
-  - ticker validation and name enrichment for universe CSV refresh scripts
-  - does not provide full index-constituent lists via one REST endpoint
-
-- **SEC EDGAR + Press Releases (planned for retrieval/RAG)**
-  - filing-grounded evidence and company-issued event text
-
----
-
-## ⚙️ Technical Architecture
-
-### Frontend
-- Next.js (React)
-- TypeScript
-- Tailwind CSS
-
-### Backend
-- FastAPI (Python)
-- Service-based modular architecture
-- Pydantic schemas for structured outputs
-
-### AI Design (Planned)
-- LLM integration (GPT / Llama / Mistral)
-- Agent system (Planner–Executor–Critic)
-- Hybrid RAG (vector + keyword retrieval)
-- FinBERT sentiment model
-
----
-
-## 🔄 System Flow
-
-Frontend → API Layer → Service Layer → Schema Validation → Response
-
-Example:
-
-User → Fundamental API → yfinance → Rule Engine → Structured Output → UI
-
----
-
-## 🧪 Evaluation Plan (Upcoming)
-
-We will evaluate system performance using:
-
-### Dataset
-- 100+ test cases across:
-  - price explanations
-  - fundamental analysis
-  - sentiment analysis
-  - chatbot queries
-
-### Metrics
-- numerical accuracy
-- response completeness
-- hallucination rate
-- latency and cost
-
-### Model Comparison
-- GPT-4o (baseline)
-- Open-source model (Llama / Mistral)
-- Secondary model (TBD)
-
----
-
-## 🚧 Current Progress
-
-### ✅ Completed
-- Backend APIs for:
-  - buy/sell analysis:
-    - phase 1 report schema + mock endpoint
-    - phase 2 layer1 data bundle endpoint (`/api/buy-sell/data/{ticker}`)
-  - fundamental analysis
-  - market movers
-  - sentiment (basic)
-  - chat (skeleton)
-  - auth (mock)
-- Frontend pages:
-  - buy/sell report (mock)
-  - market movers
-  - fundamentals
-  - chatbot
-  - history
-  - login
-- Structured schemas for all modules
-- Deterministic fundamental analysis engine
-- Layer1 source docs and call-budget tracking:
-  - `docs/API-keys.md`
-  - `docs/API-keys-testing.md`
-  - `docs/Layer1-api-call-ledger.md`
-
----
-
-### 🔄 In Progress
-- Buy/sell scoring engine (fundamental / technical / sentiment scores)
-- Buy/sell report synthesis pipeline from Layer1 bundle
-- News sentiment refinement and source fallback handling
-- Retrieval source prep (SEC + press release ingestion design)
-- Chatbot routing and responses
-
----
-
-### ⏳ Pending
-- LLM integration
-- Agent-based reasoning system
-- Hybrid RAG with citations
-- Multi-model comparison
-- Long-horizon memory
-- Formal eval harness for 50+ buy/sell test cases
-
----
-
-## 🔮 Next Steps
-
-1. Complete Buy/Sell scoring + final recommendation mapping (see `docs/BuySellAnalysis-roadmap.md`)  
-2. Integrate LLM section writer for buy/sell narratives with citations  
-3. Implement Planner–Executor–Critic workflow for buy/sell + chat paths  
-4. Add hybrid RAG over SEC + press release + general news sources  
-5. Expand eval dataset and multi-model benchmarking  
-6. Improve sentiment quality and fallback behavior  
-7. Implement Google OAuth authentication  
-
-Buy/Sell planning docs:
-- `docs/BuySellAnalysis-roadmap.md`
-- `docs/BuySellAnalysis-data-sources.md`
-- `docs/BuySellAnalysis-retrieval-sources.md`
-
----
-
-## 🚀 Setup & Running the Project
-
-### 🔧 Backend Setup
+### 1. Ollama (local LLMs)
 
 ```bash
+# Install from https://ollama.com then:
+ollama pull llama3.1:8b
+ollama pull mistral:7b
+ollama serve
+```
+
+Ollama runs at `http://localhost:11434` by default.
+
+### 2. Backend
+
+```bash
+cd backend
 python -m venv .venv
-source .venv/bin/activate  # Mac/Linux
-.venv\Scripts\activate    # Windows
-```
+source .venv/bin/activate   # Mac/Linux
+# .venv\Scripts\activate    # Windows
 
-```bash
 pip install --upgrade pip
-pip install -r backend/requirements.txt
+pip install -r requirements.txt
 ```
 
----
-
-### ▶️ Run Backend
+Copy and fill in `.env`:
 
 ```bash
-uvicorn app.main:app --reload --app-dir backend
+cp .env.example .env
 ```
 
-Open API docs:
+`.env` example:
 
-http://127.0.0.1:8000/docs
+```env
+# Google Gemini
+GEMINI_API_KEY=your_gemini_key_here
+GEMINI_MODEL=gemini-1.5-flash
 
----
+# Ollama (local)
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_LLAMA_MODEL=llama3.1:8b
+OLLAMA_MISTRAL_MODEL=mistral:7b
 
-### ⚠️ CORS Configuration
+# News data (optional — mock data used when absent)
+FINNHUB_API_KEY=
+ALPHA_VANTAGE_API_KEY=
 
-Ensure `backend/.env` contains:
+# FinBERT sentiment (optional — keyword fallback when absent)
+HUGGINGFACE_API_TOKEN=
+FINBERT_ENABLED=true
+FINBERT_MODEL_ID=ProsusAI/finbert
 
+# CORS
 CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+```
 
-### 🔑 API Keys
+Start the backend:
 
-6. **API keys** (Alpha Vantage, Finnhub, Polygon for scripts, etc.): copy
-   `backend/.env.example` to `backend/.env` and see [`docs/API-keys.md`](docs/API-keys.md).
-   To test that keys work for a stock, see [`docs/API-keys-testing.md`](docs/API-keys-testing.md).
+```bash
+cd backend
+python -m uvicorn app.main:app --reload
+```
 
----
+API docs: http://127.0.0.1:8000/docs
 
-### 🌐 Frontend Setup
+### 3. Frontend
 
 ```bash
 cd frontend
-cp .env.local.example .env.local
+cp .env.local.example .env.local   # set NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000
 npm install
 npm run dev
 ```
 
-Open:
-
-http://localhost:3000
+Open: http://localhost:3000
 
 ---
 
-### 🔗 Backend–Frontend Connection
+## API Endpoints
 
-Backend: http://127.0.0.1:8000
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/buy-sell/analyze/{ticker}` | Full buy/sell analysis with LLM review |
+| GET | `/api/analysis/fundamental?ticker=AAPL` | Fundamental analysis + LLM summary |
+| POST | `/api/analysis/news-sentiment` | News sentiment + FinBERT + LLM themes |
+| POST | `/api/chat/query` | Chatbot query |
+| GET | `/api/history` | Chat and research history |
+| POST | `/api/evaluation/compare-models` | Multi-model comparison |
+| GET | `/market-movers` | Top gainers/losers |
+| GET | `/health` | Health check |
 
-Frontend uses:
+### Multi-model comparison example
 
-NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000
+```bash
+curl -X POST http://127.0.0.1:8000/api/evaluation/compare-models \
+  -H "Content-Type: application/json" \
+  -d '{"task": "sentiment", "ticker": "NVDA", "query": "What is the market sentiment for NVDA?"}'
+```
+
+### Buy/sell with LLM review
+
+```bash
+curl "http://127.0.0.1:8000/api/buy-sell/analyze/AAPL?include_llm_review=true"
+```
 
 ---
 
-### 📊 Available Pages
+## Architecture
 
-- /buy-sell
-- /market-movers
-- /fundamentals
-- /chatbot
-- /history
-- /login
+```
+Frontend (Next.js + TypeScript + Tailwind)
+    └── API Layer (FastAPI + Pydantic)
+            ├── services/ai/llm_service.py   ← Gemini + Ollama router
+            ├── services/ai/prompts.py        ← all prompt templates
+            ├── services/news_sentiment_service.py
+            ├── services/chat_service.py
+            ├── services/history_service.py
+            ├── services/buy_sell_llm_service.py
+            ├── app/services/buy_sell_scoring.py  ← deterministic engine
+            ├── app/services/fundamental_service.py
+            └── app/rag/                      ← hybrid BM25 + embedding retrieval
+```
 
 ---
+
+## Technical Stack
+
+- **Backend:** Python 3.9+, FastAPI, Pydantic v2, yfinance, httpx
+- **Frontend:** Next.js 15, React, TypeScript, Tailwind CSS
+- **LLMs:** Gemini 1.5 Flash (Google AI), LLaMA 3.1 8B + Mistral 7B (Ollama)
+- **Sentiment:** FinBERT via HuggingFace Inference API
+- **Storage:** JSON file store (history), in-memory cache (market movers)
+
+---
+
+## Available Pages
+
+| Route | Description |
+|-------|-------------|
+| `/` | Home / dashboard |
+| `/buy-sell` | Buy/Sell analysis report |
+| `/market-movers` | Top gainers and losers |
+| `/fundamentals` | Fundamental analysis |
+| `/chatbot` | AI chatbot |
+| `/history` | Research and chat history |
+| `/login` | Authentication |
+
+---
+
+## Disclaimer
+
+All outputs are for educational purposes only and are not financial advice. Always consult a licensed financial adviser before making investment decisions.

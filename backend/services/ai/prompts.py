@@ -201,3 +201,147 @@ def build_general_finance_prompt(query: str) -> str:
         safety=SAFETY_BLOCK,
         query=query,
     )
+
+
+# ── Buy/Sell LLM explanation ───────────────────────────────────────────────────
+
+BUY_SELL_EXPLANATION_PROMPT = """\
+{safety}
+
+You are an educational financial analyst explaining a deterministic scoring model's output.
+
+Ticker: {ticker}
+Deterministic Recommendation: {recommendation}
+Overall Score: {overall_score}/100
+
+Dimension Scores (rule-based, not your opinion):
+- Fundamental: {fundamental_score}/100
+- Technical:   {technical_score}/100
+- Sentiment:   {sentiment_score}/100
+
+Key signals from the data:
+{signals}
+
+Instructions:
+1. In 3-4 sentences, explain in plain English what drove this deterministic score.
+2. Reference ONLY the signals listed above — do NOT invent new data.
+3. Do NOT make an independent buy/sell recommendation — just explain the model's output.
+4. End with: "This is for educational purposes only and is not financial advice."
+
+Return ONLY plain text (no JSON, no markdown fences).
+"""
+
+
+def build_buy_sell_explanation_prompt(
+    ticker: str,
+    recommendation: str,
+    overall_score: int,
+    fundamental_score: int,
+    technical_score: int,
+    sentiment_score: int,
+    signals: list[str],
+) -> str:
+    signals_text = "\n".join(f"- {s}" for s in signals) if signals else "- No specific signals available."
+    return BUY_SELL_EXPLANATION_PROMPT.format(
+        safety=SAFETY_BLOCK,
+        ticker=ticker.upper(),
+        recommendation=recommendation,
+        overall_score=overall_score,
+        fundamental_score=fundamental_score,
+        technical_score=technical_score,
+        sentiment_score=sentiment_score,
+        signals=signals_text,
+    )
+
+
+# ── Fundamental LLM explanation ────────────────────────────────────────────────
+
+FUNDAMENTAL_EXPLANATION_PROMPT = """\
+{safety}
+
+You are an educational financial analyst explaining a rule-based fundamental analysis.
+
+Ticker: {ticker}
+Rule-based Verdict: {verdict}
+
+Metrics extracted from public filings:
+{metrics_text}
+
+Strengths identified by rule engine:
+{strengths_text}
+
+Risks identified by rule engine:
+{risks_text}
+
+Instructions:
+1. Write 3-4 sentences explaining this company's financial health in plain English.
+2. Cite ONLY the metrics and signals listed above — do NOT invent figures.
+3. Do NOT make investment recommendations.
+4. End with: "This is for educational purposes only and is not financial advice."
+
+Return ONLY plain text (no JSON, no markdown fences).
+"""
+
+
+def build_fundamental_explanation_prompt(
+    ticker: str,
+    verdict: str,
+    metrics: dict,
+    strengths: list[str],
+    risks: list[str],
+) -> str:
+    metrics_lines = [
+        f"- {k.replace('_', ' ').title()}: {v}" for k, v in metrics.items() if v is not None
+    ]
+    metrics_text = "\n".join(metrics_lines) if metrics_lines else "- Metrics not available."
+    strengths_text = "\n".join(f"- {s}" for s in strengths) if strengths else "- None flagged."
+    risks_text = "\n".join(f"- {r}" for r in risks) if risks else "- None flagged."
+    return FUNDAMENTAL_EXPLANATION_PROMPT.format(
+        safety=SAFETY_BLOCK,
+        ticker=ticker.upper(),
+        verdict=verdict,
+        metrics_text=metrics_text,
+        strengths_text=strengths_text,
+        risks_text=risks_text,
+    )
+
+
+# ── Multi-model comparison ─────────────────────────────────────────────────────
+
+MULTI_MODEL_TASK_PROMPT = """\
+{safety}
+
+You are an educational financial analyst. Task: {task_label}
+
+Ticker: {ticker}
+Query: "{query}"
+
+Focus area: {task_hint}
+
+Instructions:
+1. Provide a clear, factual 3-4 sentence response to the query.
+2. List exactly 3 key observations as bullet points.
+3. Do NOT give direct buy/sell recommendations.
+4. End with: "This is for educational purposes only and is not financial advice."
+
+Return ONLY valid JSON — no markdown fences, no extra text:
+{{"answer": "...", "bullets": ["...", "...", "..."]}}
+"""
+
+_TASK_HINTS = {
+    "chat": "general market analysis and stock information",
+    "sentiment": "news tone, analyst views, and recent market sentiment",
+    "buy_sell": "technical momentum, valuation signals, and risk/reward profile",
+    "fundamental": "financial metrics, profitability, revenue growth, and balance sheet health",
+}
+
+
+def build_multi_model_comparison_prompt(task: str, ticker: str, query: str) -> str:
+    hint = _TASK_HINTS.get(task, "general financial analysis")
+    return MULTI_MODEL_TASK_PROMPT.format(
+        safety=SAFETY_BLOCK,
+        task_label=task.replace("_", " ").title(),
+        ticker=ticker.upper(),
+        query=query,
+        task_hint=hint,
+    )
