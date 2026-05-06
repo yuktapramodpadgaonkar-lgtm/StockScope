@@ -5,7 +5,7 @@ Flow per query:
   1. Safety check  — reject financial-advice requests immediately.
   2. Intent detect — classify query into a known intent via keyword router.
   3. Tool select   — pull relevant data (news sentiment, history).
-  4. LLM generate  — craft answer + bullets from data context (Gemini → LLaMA → Mistral).
+  4. LLM generate  — craft answer + bullets via LLMService (Gemini → LLaMA → Mistral).
   5. Fallback      — if all LLMs fail, return a safe keyword-based response.
 """
 
@@ -17,14 +17,20 @@ import uuid
 from datetime import datetime, timezone
 
 from app.schemas.chat import ChatCitation, ChatIntent, ChatQueryResponse
-from app.services.llm_router import call_llm_with_fallback
+from services.ai.llm_service import LLMService
+from services.ai.prompts import (
+    build_comparison_prompt,
+    build_general_finance_prompt,
+    build_sentiment_question_prompt,
+    build_stock_explanation_prompt,
+)
 from services.history_service import get_history, save_chat_interaction
 from services.news_sentiment_service import build_news_sentiment_report
 
 _DISCLAIMER = "This response is for educational purposes only and is not financial advice."
 _TICKER_RE = re.compile(r"\b[A-Z]{1,5}\b")
+_llm = LLMService()
 
-# Common words to filter out of ticker extraction.
 _STOPWORDS = frozenset(
     {"WHY", "WHAT", "HOW", "THE", "AND", "IS", "ARE", "FOR", "CAN", "YOU",
      "ME", "MY", "ON", "IN", "AT", "TO", "OF", "IT", "THIS", "THAT", "DO",
@@ -50,7 +56,6 @@ def _extract_tickers(query: str) -> list[str]:
 
 # ── Safety layer ──────────────────────────────────────────────────────────────
 
-# Phrases that signal the user is asking for personalised investment advice.
 _ADVICE_PATTERNS = re.compile(
     r"\b(should i (buy|sell|invest|hold|short)|what (should i|do i) (buy|sell|invest|pick)|"
     r"best stock(s)? to buy|recommend(ation)?s? (for|to) (buy|invest)|"
@@ -62,14 +67,12 @@ _ADVICE_PATTERNS = re.compile(
 
 
 def _is_financial_advice(query: str) -> bool:
-    """Return True when the query is asking for personalised buy/sell advice."""
     return bool(_ADVICE_PATTERNS.search(query))
 
 
 # ── Intent detection ──────────────────────────────────────────────────────────
 
 def _detect_intent(query: str) -> ChatIntent:
-    """Lightweight keyword router — no LLM call required for routing."""
     q = query.lower().strip()
     padded = f" {q} "
 
@@ -97,64 +100,9 @@ def _detect_intent(query: str) -> ChatIntent:
     return "unknown"
 
 
-# ── LLM prompt templates ──────────────────────────────────────────────────────
-
-_EXPLANATION_PROMPT = """\
-You are an educational stock market analyst. A user asked: "{query}"
-
-Recent news context for {ticker}:
-{news_context}
-
-Sentiment data:
-- Aggregate: {positive}% positive, {neutral}% neutral, {negative}% negative
-- Detected themes: {themes}
-
-Instructions:
-1. Explain in plain English why {ticker} might be moving, citing the news context.
-2. List exactly 3 bullet-point reasons (short, specific).
-3. Never recommend buying, selling, or any specific action.
-4. Always end the answer with: "This is for educational purposes only and is not financial advice."
-
-Return ONLY valid JSON — no markdown, no extra text:
-{{"answer": "...", "bullets": ["...", "...", "..."]}}
-"""
-
-_SENTIMENT_PROMPT = """\
-You are an educational market analyst. A user asked: "{query}"
-
-Current sentiment snapshot for {ticker}:
-- {positive}% positive, {neutral}% neutral, {negative}% negative across {n_articles} recent articles.
-- Top detected themes: {themes}
-- Sample headlines: {headlines}
-
-Instructions:
-1. Explain the current sentiment picture for {ticker} in 2–3 sentences.
-2. List exactly 3 key observations as bullet points.
-3. Do NOT give buy/sell recommendations.
-4. Always end with: "This is for educational purposes only and is not financial advice."
-
-Return ONLY valid JSON — no markdown, no extra text:
-{{"answer": "...", "bullets": ["...", "...", "..."]}}
-"""
-
-_COMPARISON_PROMPT = """\
-You are an educational market analyst. A user asked: "{query}"
-
-Tickers mentioned: {tickers}
-
-Instructions:
-1. Compare the tickers on publicly known dimensions (sector, market cap tier, growth vs value).
-2. Note 3 key differences as bullet points.
-3. Do NOT tell the user which to buy or which is "better".
-4. Always end with: "This is for educational purposes only and is not financial advice."
-
-Return ONLY valid JSON — no markdown, no extra text:
-{{"answer": "...", "bullets": ["...", "...", "..."]}}
-"""
-
+# ── LLM answer helper ─────────────────────────────────────────────────────────
 
 def _parse_llm_json(raw: str) -> dict:
-    """Extract the first JSON object from a (possibly messy) LLM response."""
     raw = raw.strip()
     if raw.startswith("```"):
         raw = raw.split("```")[1]
@@ -169,18 +117,20 @@ def _parse_llm_json(raw: str) -> dict:
 def _llm_answer(
     prompt: str,
     preferred: str | None,
-) -> tuple[str, list[str], str]:
+) -> tuple[str, list[str], str | None, str | None, bool]:
     """
-    Call LLM, parse JSON response.
+    Call LLMService, parse JSON response.
 
-    Returns (answer, bullets, model_used).
+    Returns (answer, bullets, model_used, provider, fallback_used).
     Raises RuntimeError if all providers fail or JSON is malformed.
     """
-    raw, model_used = call_llm_with_fallback(prompt, preferred=preferred)
-    parsed = _parse_llm_json(raw)
+    result = _llm.generate_response(prompt, preferred_model=preferred or "gemini")
+    if result.error or not result.response:
+        raise RuntimeError(result.error or "Empty LLM response")
+    parsed = _parse_llm_json(result.response)
     answer = str(parsed.get("answer", "")).strip()
     bullets = [str(b) for b in parsed.get("bullets", [])[:5]]
-    return answer, bullets, model_used
+    return answer, bullets, result.model_used, result.provider, result.fallback_used
 
 
 # ── Response builders ─────────────────────────────────────────────────────────
@@ -206,7 +156,7 @@ def _response_stock_explanation(
     headlines = "\n".join(
         f"- [{a.sentiment}] {a.headline}" for a in sentiment.articles[:5]
     )
-    prompt = _EXPLANATION_PROMPT.format(
+    prompt = build_stock_explanation_prompt(
         query=query,
         ticker=ticker,
         news_context=headlines,
@@ -217,9 +167,11 @@ def _response_stock_explanation(
     )
 
     llm_model: str | None = None
+    llm_provider: str | None = None
+    llm_fallback = False
     try:
-        answer, bullets, llm_model = _llm_answer(prompt, preferred_model)
-    except Exception:  # noqa: BLE001  — keep service alive
+        answer, bullets, llm_model, llm_provider, llm_fallback = _llm_answer(prompt, preferred_model)
+    except Exception:  # noqa: BLE001
         answer = (
             f"{ticker} is reacting to recent coverage that skews "
             f"{sentiment.aggregate_sentiment.overall_label}. "
@@ -243,6 +195,8 @@ def _response_stock_explanation(
         disclaimer=_DISCLAIMER,
         timestamp=ts,
         llm_model_used=llm_model,
+        llm_provider=llm_provider,
+        llm_fallback_used=llm_fallback,
     )
 
 
@@ -256,7 +210,7 @@ def _response_sentiment(
 ) -> ChatQueryResponse:
     sentiment = build_news_sentiment_report(ticker, None, None, max_articles=5)
     headlines = "; ".join(a.headline for a in sentiment.articles[:3])
-    prompt = _SENTIMENT_PROMPT.format(
+    prompt = build_sentiment_question_prompt(
         query=query,
         ticker=ticker,
         positive=sentiment.aggregate_sentiment.positive,
@@ -268,8 +222,10 @@ def _response_sentiment(
     )
 
     llm_model: str | None = None
+    llm_provider: str | None = None
+    llm_fallback = False
     try:
-        answer, bullets, llm_model = _llm_answer(prompt, preferred_model)
+        answer, bullets, llm_model, llm_provider, llm_fallback = _llm_answer(prompt, preferred_model)
     except Exception:  # noqa: BLE001
         answer = (
             f"Sentiment for {ticker} is {sentiment.aggregate_sentiment.overall_label}. "
@@ -291,6 +247,8 @@ def _response_sentiment(
         disclaimer=_DISCLAIMER,
         timestamp=ts,
         llm_model_used=llm_model,
+        llm_provider=llm_provider,
+        llm_fallback_used=llm_fallback,
     )
 
 
@@ -301,14 +259,16 @@ def _response_comparison(
     tickers: list[str],
     preferred_model: str | None,
 ) -> ChatQueryResponse:
-    prompt = _COMPARISON_PROMPT.format(
+    prompt = build_comparison_prompt(
         query=query,
         tickers=", ".join(tickers) if tickers else "the mentioned tickers",
     )
 
     llm_model: str | None = None
+    llm_provider: str | None = None
+    llm_fallback = False
     try:
-        answer, bullets, llm_model = _llm_answer(prompt, preferred_model)
+        answer, bullets, llm_model, llm_provider, llm_fallback = _llm_answer(prompt, preferred_model)
     except Exception:  # noqa: BLE001
         answer = (
             f"Comparison for {', '.join(tickers)} is not available right now — "
@@ -330,6 +290,49 @@ def _response_comparison(
         disclaimer=_DISCLAIMER,
         timestamp=ts,
         llm_model_used=llm_model,
+        llm_provider=llm_provider,
+        llm_fallback_used=llm_fallback,
+    )
+
+
+def _response_general_finance(
+    query: str,
+    thread_id: str,
+    ts: str,
+    tickers: list[str],
+    preferred_model: str | None,
+) -> ChatQueryResponse:
+    prompt = build_general_finance_prompt(query=query)
+
+    llm_model: str | None = None
+    llm_provider: str | None = None
+    llm_fallback = False
+    try:
+        answer, bullets, llm_model, llm_provider, llm_fallback = _llm_answer(prompt, preferred_model)
+    except Exception:  # noqa: BLE001
+        answer = (
+            "I'm not sure how to classify that query yet. "
+            "Try rephrasing with a ticker symbol, or ask about sentiment, "
+            "a recent price move, or a comparison between two stocks."
+        )
+        bullets = [
+            "Intent router is keyword-based; include a ticker for best results.",
+            "Example: 'Why is TSLA down today?' or 'What is MSFT sentiment?'",
+            "Educational use only — not financial advice.",
+        ]
+
+    return ChatQueryResponse(
+        thread_id=thread_id,
+        detected_intent="unknown",
+        tickers=tickers,
+        answer=answer,
+        summary_bullets=bullets,
+        citations=[],
+        disclaimer=_DISCLAIMER,
+        timestamp=ts,
+        llm_model_used=llm_model,
+        llm_provider=llm_provider,
+        llm_fallback_used=llm_fallback,
     )
 
 
@@ -362,7 +365,6 @@ def _response_advice_rejected(
     ts: str,
     tickers: list[str],
 ) -> ChatQueryResponse:
-    """Return a safe refusal with an educational explanation."""
     return ChatQueryResponse(
         thread_id=thread_id,
         detected_intent="financial_advice_rejected",
@@ -382,30 +384,6 @@ def _response_advice_rejected(
         disclaimer=_DISCLAIMER,
         timestamp=ts,
         safety_triggered=True,
-    )
-
-
-def _response_unknown(
-    thread_id: str,
-    ts: str,
-    tickers: list[str],
-) -> ChatQueryResponse:
-    return ChatQueryResponse(
-        thread_id=thread_id,
-        detected_intent="unknown",
-        tickers=tickers,
-        answer=(
-            "I'm not sure how to classify that query yet. "
-            "Try rephrasing with a ticker symbol, or ask about sentiment, "
-            "a recent price move, or a comparison between two stocks."
-        ),
-        summary_bullets=[
-            "Intent router is keyword-based; include a ticker for best results.",
-            "Example: 'Why is TSLA down today?' or 'What is MSFT sentiment?'",
-        ],
-        citations=[],
-        disclaimer=_DISCLAIMER,
-        timestamp=ts,
     )
 
 
@@ -431,10 +409,13 @@ def handle_chat_query(
     tickers = _extract_tickers(text)
     primary = tickers[0] if tickers else "NVDA"
 
-    # Step 1: Safety gate — must run before intent routing.
+    # Step 1: Safety gate.
     if _is_financial_advice(text):
         response = _response_advice_rejected(text, tid, ts, tickers)
-        save_chat_interaction(tid, text, response.answer)
+        save_chat_interaction(
+            tid, text, response.answer,
+            intent="financial_advice_rejected",
+        )
         return response
 
     # Step 2 & 3: Route to the right handler.
@@ -449,7 +430,13 @@ def handle_chat_query(
     elif intent == "history_lookup":
         response = _response_history(tid, ts, tickers)
     else:
-        response = _response_unknown(tid, ts, tickers)
+        response = _response_general_finance(text, tid, ts, tickers, model_name)
 
-    save_chat_interaction(tid, text, response.answer)
+    save_chat_interaction(
+        tid, text, response.answer,
+        intent=response.detected_intent,
+        model_used=response.llm_model_used,
+        provider=response.llm_provider,
+        fallback_used=response.llm_fallback_used if response.llm_fallback_used else None,
+    )
     return response

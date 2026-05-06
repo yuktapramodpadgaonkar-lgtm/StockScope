@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-"""Chatbot API (Week 1 stub)."""
+"""Chatbot API — intent-routed LLM responses with safety layer."""
 
 from fastapi import APIRouter, HTTPException
 
@@ -12,11 +12,7 @@ router = APIRouter(prefix="/api/chat", tags=["Chat"])
 
 @router.post("/query", response_model=ChatQueryResponse)
 def post_chat_query(body: ChatQueryRequest) -> ChatQueryResponse:
-    """
-    Accept a user question and return a structured mock chatbot response.
-
-    TODO: Swap ``handle_chat_query`` for agent + retrieval pipeline.
-    """
+    """Accept a user question and return a structured LLM-backed chatbot response."""
     try:
         return handle_chat_query(body.query, body.thread_id, model_name=body.model_name)
     except ValueError as e:

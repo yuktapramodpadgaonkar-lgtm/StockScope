@@ -63,10 +63,17 @@ class Settings(BaseSettings):
     # Phase 8 — evaluation harness (see backend/evaluation/)
     eval_output_dir: str = ""  # optional override; default writes under data/eval/
 
-    # ── Multi-LLM providers (Gemini · LLaMA/Groq · Mistral/OpenRouter) ──────
-    # Set at least one key; call_llm_with_fallback tries them in order.
+    # ── Gemini (Revati's primary LLM) ────────────────────────────────────────
     gemini_api_key: str = ""
     gemini_model: str = "gemini-1.5-flash"
+
+    # ── Ollama local fallbacks (Revati's module) ──────────────────────────────
+    # Run: ollama serve  &&  ollama pull llama3.1:8b  &&  ollama pull mistral:7b
+    ollama_base_url: str = "http://localhost:11434"
+    ollama_llama_model: str = "llama3.1:8b"
+    ollama_mistral_model: str = "mistral:7b"
+
+    # ── Shared LLM router (other modules — Groq/OpenRouter) ──────────────────
     groq_api_key: str = ""
     groq_model: str = "llama3-8b-8192"
     openrouter_api_key: str = ""

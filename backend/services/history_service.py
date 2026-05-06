@@ -138,7 +138,15 @@ def save_prompt(title: str, prompt_text: str) -> SavePromptResponse:
     return SavePromptResponse(saved_prompt=item)
 
 
-def save_chat_interaction(thread_id: str, user_text: str, assistant_text: str) -> None:
+def save_chat_interaction(
+    thread_id: str,
+    user_text: str,
+    assistant_text: str,
+    intent: str | None = None,
+    model_used: str | None = None,
+    provider: str | None = None,
+    fallback_used: bool | None = None,
+) -> None:
     """Append user+assistant messages and keep chat history updated."""
     store = _load_store()
     ts = _utc_now_iso()
@@ -146,7 +154,16 @@ def save_chat_interaction(thread_id: str, user_text: str, assistant_text: str) -
     thread_entry = threads.setdefault(thread_id, {"messages": []})
     messages = thread_entry.setdefault("messages", [])
     messages.append({"role": "user", "text": user_text, "timestamp": ts})
-    messages.append({"role": "assistant", "text": assistant_text, "timestamp": ts})
+    assistant_msg: dict[str, Any] = {"role": "assistant", "text": assistant_text, "timestamp": ts}
+    if intent is not None:
+        assistant_msg["intent"] = intent
+    if model_used is not None:
+        assistant_msg["model_used"] = model_used
+    if provider is not None:
+        assistant_msg["provider"] = provider
+    if fallback_used is not None:
+        assistant_msg["fallback_used"] = fallback_used
+    messages.append(assistant_msg)
 
     chat_history = store.setdefault("chat_history", [])
     title = user_text.strip()[:90] or "Untitled question"
@@ -160,17 +177,24 @@ def save_chat_interaction(thread_id: str, user_text: str, assistant_text: str) -
     _save_store(store)
 
 
-def save_research_run(kind: str, ticker: str) -> None:
+def save_research_run(
+    kind: str,
+    ticker: str,
+    model_used: str | None = None,
+    provider: str | None = None,
+) -> None:
     """Persist a research run marker for sentiment/fundamental workflows."""
     store = _load_store()
     runs = store.setdefault("research_history", [])
-    runs.insert(
-        0,
-        {
-            "id": f"research_{uuid.uuid4().hex[:8]}",
-            "type": kind,
-            "ticker": ticker.upper(),
-            "created_at": _utc_now_iso(),
-        },
-    )
+    entry: dict[str, Any] = {
+        "id": f"research_{uuid.uuid4().hex[:8]}",
+        "type": kind,
+        "ticker": ticker.upper(),
+        "created_at": _utc_now_iso(),
+    }
+    if model_used is not None:
+        entry["model_used"] = model_used
+    if provider is not None:
+        entry["provider"] = provider
+    runs.insert(0, entry)
     _save_store(store)

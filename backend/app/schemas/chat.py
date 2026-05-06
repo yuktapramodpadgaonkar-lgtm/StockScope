@@ -43,3 +43,5 @@ class ChatQueryResponse(BaseModel):
     timestamp: str
     safety_triggered: bool = False
     llm_model_used: str | None = None
+    llm_provider: str | None = None
+    llm_fallback_used: bool = False
