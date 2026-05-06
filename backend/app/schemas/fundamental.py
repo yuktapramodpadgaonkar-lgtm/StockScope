@@ -28,3 +28,12 @@ class FundamentalAnalysisResponse(BaseModel):
     risks: list[str]
     verdict: str
     disclaimer: str
+    ai_summary: str | None = Field(
+        default=None,
+        description="Optional plain-language explanation from a local LLM; only the deterministic JSON is its source.",
+    )
+    ai_model: str | None = Field(default=None, description="Ollama model id when include_llm was requested.")
+    ai_error: str | None = Field(
+        default=None,
+        description="Set when include_llm was true but the LLM call failed; deterministic fields are still valid.",
+    )

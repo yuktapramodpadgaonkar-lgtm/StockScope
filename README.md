@@ -252,23 +252,32 @@ pip install -r backend/requirements.txt
 uvicorn app.main:app --reload --app-dir backend
 ```
 
-Open API docs:
+Interactive API docs: **http://127.0.0.1:8000/docs**
 
-http://127.0.0.1:8000/docs
+### Fundamental analysis + multi-model AI (optional)
 
----
+- Set **`GEMINI_API_KEY`** in `backend/.env` for the **Gemini** option on **`/fundamentals`**.
+- For **Mistral** / **Llama 3.1**, run [Ollama](https://ollama.com/) and pull models:
+
+  ```bash
+  ollama pull mistral:7b
+  ollama pull llama3.1:8b
+  ```
+
+- Override **`OLLAMA_BASE_URL`** in `backend/.env` if Ollama is not on `http://localhost:11434`.
+- Each **Analyze** sends `include_llm=true` with the selected provider/model; deterministic
+  metrics still load if the LLM fails (see **`ai_error`** in the UI).
 
 ### ⚠️ CORS Configuration
 
 Ensure `backend/.env` contains:
 
-CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+`CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000`
 
 ### 🔑 API Keys
 
-6. **API keys** (Alpha Vantage, Finnhub, Polygon for scripts, etc.): copy
-   `backend/.env.example` to `backend/.env` and see [`docs/API-keys.md`](docs/API-keys.md).
-   To test that keys work for a stock, see [`docs/API-keys-testing.md`](docs/API-keys-testing.md).
+Copy `backend/.env.example` to `backend/.env`. For Layer 1 / news / scripts, see
+[`docs/API-keys.md`](docs/API-keys.md) and [`docs/API-keys-testing.md`](docs/API-keys-testing.md).
 
 ---
 
@@ -281,9 +290,7 @@ npm install
 npm run dev
 ```
 
-Open:
-
-http://localhost:3000
+Open **http://localhost:3000** — e.g. **`/market-movers`**, **`/fundamentals`**, **`/chatbot`**.
 
 ---
 

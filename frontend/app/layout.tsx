@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { FloatingChatButton } from "@/components/FloatingChatButton";
+import { AuthGate } from "@/components/AuthGate";
 import { Navbar } from "@/components/Navbar";
 import "./globals.css";
 
@@ -18,8 +18,7 @@ export default function RootLayout({
     <html lang="en">
       <body className="min-h-screen font-sans antialiased">
         <Navbar />
-        {children}
-        <FloatingChatButton />
+        <AuthGate>{children}</AuthGate>
       </body>
     </html>
   );

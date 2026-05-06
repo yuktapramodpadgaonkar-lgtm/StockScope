@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # backend/app/core/config.py -> parents[2] == backend/
@@ -36,19 +37,14 @@ class Settings(BaseSettings):
     movers_cache_ttl_previous_day_seconds: int = 300
 
     # Phase 5.1 — RAG retrieval (embeddings + store hygiene)
-    # Hugging Face sentence embeddings (same token as LLM). If unset, retrieval falls back to BM25-only.
     rag_embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
     rag_embedding_batch_size: int = 16
     rag_bm25_weight: float = 0.45
     rag_embedding_weight: float = 0.55
-    # Default max age for retrieved chunks (days). None disables age filter in settings; API can still pass a value.
-    # Use -1 to disable published_at freshness filtering (when not overridden by the API).
     rag_max_chunk_age_days: int = 730
     rag_max_total_chunks: int = 80_000
     rag_max_chunks_per_ticker: int = 600
-    # When chunks.jsonl exceeds this size, rotate to an archive file and start fresh (+ clear per-ticker embedding npz).
     rag_rotate_bytes: int = 100 * 1024 * 1024
-    # SEC EDGAR (data.sec.gov / www.sec.gov) — SEC requires a descriptive User-Agent with contact info.
     sec_edgar_enabled: bool = True
     sec_user_agent: str = ""
     sec_filings_limit: int = 2
@@ -56,34 +52,31 @@ class Settings(BaseSettings):
     sec_cik_cache_hours: int = 168
     sec_request_delay_seconds: float = 0.15
 
-    # Phase 7 — session memory (file-backed under StockScope/data/memory/)
     memory_enabled: bool = True
     memory_max_recent_tickers: int = 30
 
-    # Phase 8 — evaluation harness (see backend/evaluation/)
-    eval_output_dir: str = ""  # optional override; default writes under data/eval/
+    eval_output_dir: str = ""
 
-    # ── Gemini (Revati's primary LLM) ────────────────────────────────────────
-    gemini_api_key: str = ""
+    # Gemini (chat, news, fundamentals AI explanation) — use AI Studio key in .env
+    gemini_api_key: str = Field(
+        default="",
+        validation_alias=AliasChoices("GEMINI_API_KEY", "gemini_api_key"),
+    )
     gemini_model: str = "gemini-1.5-flash"
 
-    # ── Ollama local fallbacks (Revati's module) ──────────────────────────────
-    # Run: ollama serve  &&  ollama pull llama3.1:8b  &&  ollama pull mistral:7b
-    ollama_base_url: str = "http://localhost:11434"
+    ollama_base_url: str = Field(
+        default="http://localhost:11434",
+        validation_alias=AliasChoices("OLLAMA_BASE_URL", "ollama_base_url"),
+    )
     ollama_llama_model: str = "llama3.1:8b"
     ollama_mistral_model: str = "mistral:7b"
 
-    # ── Shared LLM router (other modules — Groq/OpenRouter) ──────────────────
     groq_api_key: str = ""
     groq_model: str = "llama3-8b-8192"
     openrouter_api_key: str = ""
     openrouter_model: str = "mistralai/mistral-7b-instruct"
-    # Which provider to try first when no explicit preference is given.
     default_llm_provider: str = "gemini"  # gemini | llama | mistral
 
-    # ── FinBERT sentiment (Phase N) ──────────────────────────────────────────
-    # Reuses huggingface_api_token from Phase 4. Set finbert_enabled=false to
-    # stay on the keyword heuristic without an HF token.
     finbert_enabled: bool = True
     finbert_model_id: str = "ProsusAI/finbert"
 
