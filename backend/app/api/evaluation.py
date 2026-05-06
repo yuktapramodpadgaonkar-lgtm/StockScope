@@ -1,0 +1,124 @@
+"""
+Multi-model comparison endpoint.
+
+Runs the same task/prompt through Gemini, LLaMA, and Mistral independently
+and returns latency, citation count, and safety status for each.
+"""
+
+from __future__ import annotations
+
+import re
+import time
+from typing import Literal
+
+from fastapi import APIRouter
+from pydantic import BaseModel, Field
+
+from services.ai.llm_service import LLMService
+from services.ai.prompts import build_multi_model_comparison_prompt
+
+router = APIRouter(prefix="/api/evaluation", tags=["Evaluation"])
+
+_llm = LLMService()
+
+_ADVICE_RE = re.compile(
+    r"\b(should (?:you|i) (?:buy|sell|invest|hold)|"
+    r"(?:strong )?(?:buy|sell) recommendation|"
+    r"i (?:recommend|suggest) (?:buying|selling)|"
+    r"definitely (?:buy|sell))\b",
+    re.IGNORECASE,
+)
+
+_DISCLAIMER = "Educational use only. Not financial advice."
+
+
+# ── Schemas ───────────────────────────────────────────────────────────────────
+
+class CompareRequest(BaseModel):
+    task: Literal["chat", "sentiment", "buy_sell", "fundamental"]
+    ticker: str = Field(..., min_length=1, max_length=16)
+    query: str = Field(..., min_length=1, max_length=1000)
+
+
+class ModelResult(BaseModel):
+    model: str
+    response: str
+    latency_ms: int
+    citation_count: int
+    safety_passed: bool
+    error: str | None = None
+
+
+class CompareResponse(BaseModel):
+    task: str
+    ticker: str
+    query: str
+    results: list[ModelResult]
+    disclaimer: str = _DISCLAIMER
+
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+def _count_citations(text: str) -> int:
+    return len(re.findall(r"https?://\S+", text))
+
+
+def _safety_passed(text: str) -> bool:
+    return not bool(_ADVICE_RE.search(text))
+
+
+def _call_single_model(model_name: str, prompt: str) -> ModelResult:
+    start = time.time()
+    error: str | None = None
+    response = ""
+    try:
+        if model_name == "gemini":
+            response = _llm.generate_with_gemini(prompt)
+        elif model_name == "llama":
+            response = _llm.generate_with_ollama_llama(prompt)
+        elif model_name == "mistral":
+            response = _llm.generate_with_ollama_mistral(prompt)
+        else:
+            raise ValueError(f"Unknown model: {model_name}")
+    except Exception as exc:  # noqa: BLE001
+        error = str(exc)[:300]
+        response = f"[Model unavailable: {error}]"
+
+    latency_ms = int((time.time() - start) * 1000)
+    return ModelResult(
+        model=model_name,
+        response=response,
+        latency_ms=latency_ms,
+        citation_count=_count_citations(response),
+        safety_passed=_safety_passed(response),
+        error=error,
+    )
+
+
+# ── Endpoint ──────────────────────────────────────────────────────────────────
+
+@router.post("/compare-models", response_model=CompareResponse)
+def compare_models(body: CompareRequest) -> CompareResponse:
+    """
+    Run the same task prompt through Gemini, LLaMA, and Mistral.
+    Returns latency, citation count, and safety status for each model.
+    """
+    ticker = body.ticker.strip().upper()
+    prompt = build_multi_model_comparison_prompt(
+        task=body.task,
+        ticker=ticker,
+        query=body.query.strip(),
+    )
+
+    results = [
+        _call_single_model("gemini", prompt),
+        _call_single_model("llama", prompt),
+        _call_single_model("mistral", prompt),
+    ]
+
+    return CompareResponse(
+        task=body.task,
+        ticker=ticker,
+        query=body.query.strip(),
+        results=results,
+    )

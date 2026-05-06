@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import logging
 from statistics import pstdev
 from typing import Any
 
 from app.core.config import settings
 from app.services.huggingface_llm import generate_hf_llm_review
+
+logger = logging.getLogger(__name__)
 from app.schemas.buy_sell_analysis import (
     BuySellReport,
     CitationItem,
@@ -327,6 +330,48 @@ def _llm_review_stub(
     )
 
 
+def _build_llm_review_via_service(
+    ticker: str,
+    overall: OverallRuleScore,
+    f: DimensionRuleScore,
+    t: DimensionRuleScore,
+    s: DimensionRuleScore,
+) -> LlmReview:
+    """Use LLMService (Gemini → LLaMA → Mistral) to explain the deterministic scores."""
+    from services.buy_sell_llm_service import generate_buy_sell_explanation
+
+    signals = [
+        sig.reason
+        for sig in (f.signals + t.signals + s.signals)
+        if sig.points != 0
+    ][:8]
+
+    rationale, model_used, provider_used = generate_buy_sell_explanation(
+        ticker=ticker,
+        recommendation=overall.recommendation.value,
+        overall_score=int(round(overall.weighted_score)),
+        fundamental_score=f.score,
+        technical_score=t.score,
+        sentiment_score=s.score,
+        signals=signals,
+    )
+
+    return LlmReview(
+        enabled=True,
+        model=model_used or "none",
+        llm_score_suggestion=LlmScoreSuggestion(
+            fundamental=f.score,
+            technical=t.score,
+            sentiment=s.score,
+            overall=int(round(overall.weighted_score)),
+            recommendation=overall.recommendation,
+        ),
+        agreement_with_rules=LlmAgreement(matches_recommendation=True, overall_score_delta=0),
+        rationale=rationale,
+        warnings=[],
+    )
+
+
 def _build_llm_review(
     ticker: str,
     overall: OverallRuleScore,
@@ -340,30 +385,24 @@ def _build_llm_review(
     if not include_llm_review:
         return _llm_review_stub(overall, f, t, s, enabled=False)
 
-    if not settings.buysell_llm_enabled:
-        out = _llm_review_stub(overall, f, t, s, enabled=True)
-        out.warnings = out.warnings + ["BUYSELL_LLM_ENABLED=false; returning deterministic mirror."]
-        return out
+    # Try HuggingFace if explicitly configured
+    hf_provider = (settings.buysell_llm_provider or "none").strip().lower()
+    if settings.buysell_llm_enabled and hf_provider == "huggingface":
+        try:
+            return generate_hf_llm_review(
+                ticker=ticker,
+                overall=overall,
+                fundamental=f,
+                technical=t,
+                sentiment=s,
+                retrieval_chunks=retrieval_chunks or [],
+            )
+        except Exception as exc:
+            logger.warning("HuggingFace LLM review failed for %s: %s", ticker, exc)
+            # Fall through to LLMService
 
-    provider = (settings.buysell_llm_provider or "none").strip().lower()
-    if provider != "huggingface":
-        out = _llm_review_stub(overall, f, t, s, enabled=True)
-        out.warnings = out.warnings + [f"Unsupported provider '{provider}'. Set BUYSELL_LLM_PROVIDER=huggingface."]
-        return out
-
-    try:
-        return generate_hf_llm_review(
-            ticker=ticker,
-            overall=overall,
-            fundamental=f,
-            technical=t,
-            sentiment=s,
-            retrieval_chunks=retrieval_chunks or [],
-        )
-    except Exception as e:
-        out = _llm_review_stub(overall, f, t, s, enabled=True)
-        out.warnings = out.warnings + [f"HuggingFace review failed: {str(e)[:220]}"]
-        return out
+    # Use LLMService (Gemini → LLaMA → Mistral) as primary/fallback
+    return _build_llm_review_via_service(ticker, overall, f, t, s)
 
 
 def build_buy_sell_report_from_layer1(
