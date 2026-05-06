@@ -28,6 +28,12 @@ class FundamentalAnalysisResponse(BaseModel):
     risks: list[str]
     verdict: str
     disclaimer: str
-    llm_summary: str | None = None
-    llm_model_used: str | None = None
-    llm_provider: str | None = None
+    ai_summary: str | None = Field(
+        default=None,
+        description="Optional plain-language explanation from an LLM; deterministic fields are the source of truth.",
+    )
+    ai_model: str | None = Field(default=None, description="Model id used for ai_summary.")
+    ai_error: str | None = Field(
+        default=None,
+        description="Set when include_llm=true but the LLM call failed; deterministic fields are still valid.",
+    )

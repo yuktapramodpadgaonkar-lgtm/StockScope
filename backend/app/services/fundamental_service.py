@@ -1,16 +1,8 @@
-"""Fundamental analysis using yfinance (deterministic) + LLM explanation."""
+"""Deterministic fundamental analysis using yfinance."""
 
 from __future__ import annotations
 
-import logging
-
 import yfinance as yf
-
-from services.ai.llm_service import LLMService
-from services.ai.prompts import build_fundamental_explanation_prompt
-
-logger = logging.getLogger(__name__)
-_llm = LLMService()
 
 DISCLAIMER = (
     "This is automated, educational information only. It is not investment advice. "
@@ -136,26 +128,6 @@ def get_fundamental_report(symbol: str) -> dict:
     metrics = extract_metrics(info)
     strengths, risks, verdict = _rule_based_insights(metrics)
 
-    # LLM plain-English explanation (best-effort, never blocks the response)
-    llm_summary: str | None = None
-    llm_model_used: str | None = None
-    llm_provider: str | None = None
-    try:
-        prompt = build_fundamental_explanation_prompt(
-            ticker=sym,
-            verdict=verdict,
-            metrics=metrics,
-            strengths=strengths,
-            risks=risks,
-        )
-        result = _llm.generate_response(prompt, preferred_model="gemini")
-        if not result.error and result.response:
-            llm_summary = result.response.strip()
-            llm_model_used = result.model_used
-            llm_provider = result.provider
-    except Exception as exc:
-        logger.warning("LLM fundamental explanation failed for %s: %s", sym, exc)
-
     return {
         "ticker": sym,
         "company_name": company_name,
@@ -167,7 +139,4 @@ def get_fundamental_report(symbol: str) -> dict:
         "risks": risks,
         "verdict": verdict,
         "disclaimer": DISCLAIMER,
-        "llm_summary": llm_summary,
-        "llm_model_used": llm_model_used,
-        "llm_provider": llm_provider,
     }

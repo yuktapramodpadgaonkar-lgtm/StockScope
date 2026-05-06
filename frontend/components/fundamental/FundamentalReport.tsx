@@ -1,6 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+
+import { SectionCard } from "@/components/fundamental/SectionCard";
+import { VerdictBadge } from "@/components/fundamental/VerdictBadge";
 import { Card } from "@/components/ui/Card";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 import { MetricCard } from "@/components/ui/MetricCard";
@@ -8,8 +11,6 @@ import {
   fetchFundamentalAnalysis,
   type FundamentalAnalysisResponse,
 } from "@/lib/fundamental-api";
-import { SectionCard } from "@/components/fundamental/SectionCard";
-import { VerdictBadge } from "@/components/fundamental/VerdictBadge";
 
 function formatCap(n: number | null | undefined): string {
   if (n == null || Number.isNaN(n)) return "—";
@@ -38,12 +39,13 @@ function formatNum(n: number | null | undefined): string {
 }
 
 type FundamentalReportProps = {
-  /** Initial symbol for the lookup input (loads on mount). */
+  /** Optional initial ticker text (does not fetch until Analyze). */
   defaultTicker?: string;
 };
 
-export function FundamentalReport({ defaultTicker = "AAPL" }: FundamentalReportProps) {
+export function FundamentalReport({ defaultTicker = "" }: FundamentalReportProps) {
   const [input, setInput] = useState(defaultTicker);
+  const [llmChoice, setLlmChoice] = useState<"mistral" | "llama" | "gemini">("mistral");
   const [report, setReport] = useState<FundamentalAnalysisResponse | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -56,10 +58,18 @@ export function FundamentalReport({ defaultTicker = "AAPL" }: FundamentalReportP
       return;
     }
     setHasSearched(true);
+    const selected = llmChoice;
+    const provider = selected === "gemini" ? "gemini" : "ollama";
+    const model =
+      selected === "gemini"
+        ? "gemini-3-flash-preview"
+        : selected === "llama"
+          ? "llama3.1:8b"
+          : "mistral:7b";
     setLoading(true);
     setError(null);
     try {
-      const data = await fetchFundamentalAnalysis(sym);
+      const data = await fetchFundamentalAnalysis(sym, true, provider, model);
       setReport(data);
     } catch (e) {
       setReport(null);
@@ -67,7 +77,7 @@ export function FundamentalReport({ defaultTicker = "AAPL" }: FundamentalReportP
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [llmChoice]);
 
   useEffect(() => {
     setInput(defaultTicker);
@@ -85,8 +95,8 @@ export function FundamentalReport({ defaultTicker = "AAPL" }: FundamentalReportP
               onKeyDown={(e) => {
                 if (e.key === "Enter") void load(input);
               }}
-              placeholder="e.g. AAPL"
-              className="rounded-xl border border-slate-300 bg-white px-3 py-2.5 font-mono text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+              placeholder="Select or enter a stock ticker (e.g. AAPL)"
+              className="rounded-xl border border-slate-300 bg-white px-3 py-2.5 font-mono text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
               autoComplete="off"
               spellCheck={false}
             />
@@ -100,6 +110,23 @@ export function FundamentalReport({ defaultTicker = "AAPL" }: FundamentalReportP
             {loading ? "Analyzing..." : "Analyze"}
           </button>
         </div>
+        <div className="mt-4 max-w-md">
+          <label className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium uppercase tracking-wide text-slate-500">AI model</span>
+            <select
+              value={llmChoice}
+              onChange={(e) => setLlmChoice(e.target.value as "mistral" | "llama" | "gemini")}
+              className="rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-slate-200"
+            >
+              <option value="gemini">Gemini</option>
+              <option value="mistral">Mistral</option>
+              <option value="llama">Llama 3.1</option>
+            </select>
+            <span className="text-xs text-slate-500">
+              Each run requests an AI explanation from the selected provider; metrics stay deterministic.
+            </span>
+          </label>
+        </div>
       </Card>
 
       {error && (
@@ -109,7 +136,7 @@ export function FundamentalReport({ defaultTicker = "AAPL" }: FundamentalReportP
         </Card>
       )}
 
-      {loading && (
+      {loading && !report && (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {[...Array(8)].map((_, i) => (
             <Card key={i} className="p-4">
@@ -129,8 +156,12 @@ export function FundamentalReport({ defaultTicker = "AAPL" }: FundamentalReportP
         </Card>
       )}
 
-      {report && !loading && hasSearched && (
+      {report && (
         <div className="space-y-6">
+          {loading && (
+            <p className="text-center text-xs text-slate-500">Updating analysis…</p>
+          )}
+
           <Card>
             <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
               <div>
@@ -231,6 +262,31 @@ export function FundamentalReport({ defaultTicker = "AAPL" }: FundamentalReportP
               </ul>
             </SectionCard>
           </div>
+
+          {(report.ai_summary || report.ai_error) && (
+            <SectionCard
+              title="AI explanation"
+              subtitle="Plain-language notes based only on the metrics above—not investment advice."
+              className="border-violet-200 bg-violet-50/50"
+            >
+              {report.ai_error && (
+                <p
+                  className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+                  role="status"
+                >
+                  {report.ai_error}
+                </p>
+              )}
+              {report.ai_summary && (
+                <div className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-slate-800">
+                  {report.ai_summary}
+                </div>
+              )}
+              {report.ai_model && (
+                <p className="mt-3 text-xs text-slate-500">Model: {report.ai_model}</p>
+              )}
+            </SectionCard>
+          )}
 
           <SectionCard title="Final Verdict" subtitle="High-level signal from current fundamental scoring.">
             <div className="flex flex-wrap items-center gap-3">

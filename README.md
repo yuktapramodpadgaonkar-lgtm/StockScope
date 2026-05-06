@@ -45,7 +45,7 @@ Fallback order (per request): Gemini → LLaMA → Mistral. All LLM calls are ha
 ### 3. Fundamental Analysis
 - yfinance metrics: P/E, ROE, margins, debt/equity, growth
 - Rule-based health verdict (strengths + risks)
-- LLM plain-English explanation of the rule-based output
+- Optional LLM plain-English explanation via `include_llm=true` (Ollama Mistral/LLaMA or Gemini)
 
 ### 4. News Sentiment Analysis
 - Finnhub news fetch (falls back to mock data when key absent)
@@ -93,7 +93,7 @@ ollama pull mistral:7b
 ollama serve
 ```
 
-Ollama runs at `http://localhost:11434` by default.
+Ollama runs at `http://localhost:11434` by default. Override with `OLLAMA_BASE_URL` in `backend/.env`.
 
 ### 2. Backend
 
@@ -138,6 +138,8 @@ FINBERT_MODEL_ID=ProsusAI/finbert
 CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
 ```
 
+For Layer 1 / news / scripts API keys, see [`docs/API-keys.md`](docs/API-keys.md) and [`docs/API-keys-testing.md`](docs/API-keys-testing.md).
+
 Start the backend:
 
 ```bash
@@ -145,7 +147,15 @@ cd backend
 python -m uvicorn app.main:app --reload
 ```
 
-API docs: http://127.0.0.1:8000/docs
+Interactive API docs: **http://127.0.0.1:8000/docs**
+
+### Fundamental analysis LLM (optional)
+
+The `/fundamentals` page has an **Analyze with AI** button that calls `include_llm=true`. This uses:
+- **Gemini** — set `GEMINI_API_KEY` in `backend/.env`
+- **Mistral / LLaMA** — run Ollama locally (see step 1 above)
+
+If the LLM fails, deterministic metrics still load (see `ai_error` in the API response).
 
 ### 3. Frontend
 
@@ -156,7 +166,7 @@ npm install
 npm run dev
 ```
 
-Open: http://localhost:3000
+Open **http://localhost:3000** — e.g. `/market-movers`, `/fundamentals`, `/chatbot`.
 
 ---
 
@@ -165,12 +175,12 @@ Open: http://localhost:3000
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/api/buy-sell/analyze/{ticker}` | Full buy/sell analysis with LLM review |
-| GET | `/api/analysis/fundamental?ticker=AAPL` | Fundamental analysis + LLM summary |
+| GET | `/api/analysis/fundamental?ticker=AAPL` | Fundamental analysis + optional LLM summary |
 | POST | `/api/analysis/news-sentiment` | News sentiment + FinBERT + LLM themes |
 | POST | `/api/chat/query` | Chatbot query |
 | GET | `/api/history` | Chat and research history |
 | POST | `/api/evaluation/compare-models` | Multi-model comparison |
-| GET | `/market-movers` | Top gainers/losers |
+| GET | `/api/market-movers` | Top gainers/losers |
 | GET | `/health` | Health check |
 
 ### Multi-model comparison example
@@ -194,15 +204,16 @@ curl "http://127.0.0.1:8000/api/buy-sell/analyze/AAPL?include_llm_review=true"
 ```
 Frontend (Next.js + TypeScript + Tailwind)
     └── API Layer (FastAPI + Pydantic)
-            ├── services/ai/llm_service.py   ← Gemini + Ollama router
-            ├── services/ai/prompts.py        ← all prompt templates
+            ├── services/ai/llm_service.py       ← Gemini + Ollama router (Revati)
+            ├── app/services/ai/llm_client.py    ← provider-agnostic generate_text (Yukta/Ramya)
+            ├── services/ai/prompts.py            ← all prompt templates
             ├── services/news_sentiment_service.py
             ├── services/chat_service.py
             ├── services/history_service.py
             ├── services/buy_sell_llm_service.py
-            ├── app/services/buy_sell_scoring.py  ← deterministic engine
+            ├── app/services/buy_sell_scoring.py  ← deterministic scoring engine
             ├── app/services/fundamental_service.py
-            └── app/rag/                      ← hybrid BM25 + embedding retrieval
+            └── app/rag/                          ← hybrid BM25 + embedding retrieval
 ```
 
 ---
