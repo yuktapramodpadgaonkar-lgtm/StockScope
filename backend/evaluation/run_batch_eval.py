@@ -105,6 +105,7 @@ def run_batch() -> int:
     parser.add_argument("--live-orchestrator", action="store_true", help="Run buy_sell yfinance orchestrator cases")
     parser.add_argument("--live-multi", action="store_true", help="Run multi_model LLM comparison cases (slow)")
     parser.add_argument("--live-agentic", action="store_true", help="Run agentic RAG endpoint cases (slow; uses LLM + tools)")
+    parser.add_argument("--live-chat", action="store_true", help="Run agentic chat endpoint cases (slow; uses LLM + tools)")
     parser.add_argument("--live-fundamental", action="store_true", help="Run authed fundamental schema checks (yfinance)")
     parser.add_argument("--live-news", action="store_true", help="Run news sentiment POST cases (network)")
     parser.add_argument(
@@ -180,6 +181,40 @@ def run_batch() -> int:
                 got = _detect_intent(q)
                 if exp and got != exp:
                     status, err = "fail", f"intent {got} != {exp}"
+            elif "agentic_chat_live" in checks:
+                if not args.live_chat:
+                    status = "not_run"
+                    notes = "use --live-chat"
+                else:
+                    t0 = time.perf_counter()
+                    payload = {
+                        "query": str(inp.get("query") or ""),
+                        "thread_id": str(inp.get("thread_id") or "eval-agentic-chat"),
+                        "model_name": str(inp.get("model_name") or "gemini"),
+                    }
+                    r = client.post("/api/chat/query", json=payload)
+                    latency_ms = (time.perf_counter() - t0) * 1000.0
+                    if r.status_code != 200:
+                        status, err = "fail", f"{r.status_code}: {(r.text or '')[:200]}"
+                    else:
+                        data = r.json()
+                        if not data.get("thread_id"):
+                            status, err = "fail", "missing thread_id"
+                        elif not isinstance(data.get("citations"), list):
+                            status, err = "fail", "citations_not_list"
+                        elif not isinstance(data.get("summary_bullets"), list) or len(data.get("summary_bullets") or []) < 3:
+                            status, err = "fail", "missing_summary_bullets"
+                        else:
+                            expect_min_cits = int(inp.get("expect_min_citations") or 0)
+                            if expect_min_cits and len(data.get("citations") or []) < expect_min_cits:
+                                status, err = "fail", f"citations_too_few:{len(data.get('citations') or [])}"
+                            must_have = inp.get("expect_answer_contains") or []
+                            if status == "pass" and isinstance(must_have, list) and must_have:
+                                ans = (data.get("answer") or "").lower()
+                                for sub in must_have:
+                                    if str(sub).lower() not in ans:
+                                        status, err = "fail", f"answer_missing_substring:{sub!r}"
+                                        break
             elif "safety_financial_advice_flag" in checks:
                 from services.chat_service import _is_financial_advice
 

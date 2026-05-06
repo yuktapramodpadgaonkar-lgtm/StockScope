@@ -62,5 +62,6 @@ This document describes what StockScope implements today versus what remains asp
 
 - Batch scoring with gold labels and automated judges on the full eval set.
 - Larger few-shot / eval expansion beyond structured cases.
+- Clarify the **shared multi-model subset** for model comparisons (now: `multi_model_comparison`, `rub-054`–`rub-060`, `rub-076`–`rub-083`, and `rub-087`–`rub-089`).
 - Optional: GraphRAG or explicit agentic retrieval planner.
 - Stronger cross-module memory (chat ↔ buy/sell ↔ fundamentals) with retrieval.

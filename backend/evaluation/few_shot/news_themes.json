@@ -1,0 +1,17 @@
+{
+  "description": "Themes + summary JSON from labeled headlines.",
+  "shots": [
+    {
+      "label": "Three short themes + educational summary",
+      "headlines_sample": "- [positive] EXAMPLE: Cloud revenue beat expectations\n- [neutral] EXAMPLE: Management guidance unchanged\n- [negative] EXAMPLE: Regulatory review mentioned",
+      "output_json": {
+        "themes": [
+          "cloud revenue momentum",
+          "steady forward guidance",
+          "regulatory overhang"
+        ],
+        "summary": "Headlines lean constructive on operations but flag regulatory uncertainty; treat this as a coarse read of tone, not a forecast. This is for educational purposes only."
+      }
+    }
+  ]
+}
