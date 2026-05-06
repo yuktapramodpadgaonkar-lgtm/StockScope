@@ -10,6 +10,17 @@ from app.services.fundamental_service import get_fundamental_report
 router = APIRouter(prefix="/api/analysis/fundamental", tags=["Fundamental Analysis"])
 
 LLM_UNAVAILABLE = "AI summary unavailable. Deterministic analysis is still provided."
+
+
+def _ai_error_message(llm_detail: str | None) -> str:
+    detail = (llm_detail or "").strip()
+    if not detail:
+        return LLM_UNAVAILABLE
+    # Keep UI readable; full Gemini/Ollama hints help debug (model 404, bad key, etc.).
+    cap = 320
+    if len(detail) > cap:
+        detail = detail[: cap - 1] + "…"
+    return f"{LLM_UNAVAILABLE} ({detail})"
 _bearer = HTTPBearer(auto_error=False)
 
 
@@ -35,7 +46,7 @@ def get_fundamental_analysis(
     ),
     model: str = Query(
         "mistral:7b",
-        description="LLM model id. Examples: mistral:7b, llama3.1:8b, gemini-1.5-flash.",
+        description="LLM model id. Examples: mistral:7b, llama3.1:8b, gemini-3-flash-preview.",
     ),
     _email: str = Depends(_require_bearer_email),
 ) -> FundamentalAnalysisResponse:
@@ -58,7 +69,7 @@ def get_fundamental_analysis(
         ai_summary = result.get("text")
         if result.get("error"):
             ai_summary = None
-            ai_error = LLM_UNAVAILABLE
+            ai_error = _ai_error_message(str(result.get("error")))
 
     payload = {
         **data,

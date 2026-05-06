@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # backend/app/core/config.py -> parents[2] == backend/
@@ -24,8 +25,14 @@ class Settings(BaseSettings):
     movers_cache_ttl_previous_day_seconds: int = 300
 
     # Optional AI explanations (fundamental analysis). Loaded from backend/.env.
-    gemini_api_key: str = ""
-    ollama_base_url: str = "http://localhost:11434"
+    gemini_api_key: str = Field(
+        default="",
+        validation_alias=AliasChoices("GEMINI_API_KEY", "gemini_api_key"),
+    )
+    ollama_base_url: str = Field(
+        default="http://localhost:11434",
+        validation_alias=AliasChoices("OLLAMA_BASE_URL", "ollama_base_url"),
+    )
 
     model_config = SettingsConfigDict(
         env_file=str(_BACKEND_DIR / ".env"),

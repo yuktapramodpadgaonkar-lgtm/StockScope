@@ -64,37 +64,53 @@ def _gemini_generate_text(prompt: str, model: str) -> str:
     if not api_key:
         raise GeminiClientError("GEMINI_API_KEY is not set (add it to backend/.env)")
 
-    # Keep it simple: use Generative Language API (v1beta) with an API key.
-    # Model examples: "gemini-1.5-flash", "gemini-1.5-pro".
+    # Generative Language API (Google AI Studio key). Use v1beta; model IDs change over time
+    # (e.g. gemini-1.5-flash may 404 — prefer a current Flash model).
+    # Same host/path as https://ai.google.dev/gemini-api/docs/quickstart (REST).
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-    params = {"key": api_key}
+    headers = {
+        "x-goog-api-key": api_key,
+        "Content-Type": "application/json",
+    }
+    # Single-turn: same "contents" shape as the quickstart curl example.
     payload: dict[str, Any] = {
-        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+        "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {"temperature": 0.2},
     }
 
     try:
         with httpx.Client(timeout=DEFAULT_TIMEOUT_SEC) as client:
-            res = client.post(url, params=params, json=payload)
+            res = client.post(url, headers=headers, json=payload)
     except httpx.TimeoutException as e:
         raise GeminiClientError("Gemini request timed out") from e
     except httpx.RequestError as e:
         raise GeminiClientError(f"Gemini request failed: {e}") from e
 
-    if res.status_code != 200:
-        snippet = (res.text or "")[:300]
-        raise GeminiClientError(f"Gemini returned HTTP {res.status_code}: {snippet}".strip())
-
     try:
         data = res.json()
-    except ValueError as e:
-        raise GeminiClientError("Gemini returned a non-JSON body") from e
+    except ValueError:
+        data = {}
+
+    if res.status_code != 200:
+        err = data.get("error") if isinstance(data.get("error"), dict) else None
+        msg = err.get("message") if err else None
+        snippet = (msg or res.text or "")[:400]
+        raise GeminiClientError(f"Gemini HTTP {res.status_code}: {snippet}".strip())
+
+    pf = data.get("promptFeedback")
+    if isinstance(pf, dict) and pf.get("blockReason"):
+        raise GeminiClientError(f"Gemini blocked the prompt: {pf.get('blockReason')}")
 
     # Expected shape: { candidates: [ { content: { parts: [ { text: "..." } ] } } ] }
     candidates = data.get("candidates")
     if not isinstance(candidates, list) or not candidates:
-        raise GeminiClientError("Gemini returned no candidates")
-    content = candidates[0].get("content") if isinstance(candidates[0], dict) else None
+        raise GeminiClientError("Gemini returned no candidates (check model name and API key)")
+
+    cand0 = candidates[0] if isinstance(candidates[0], dict) else {}
+    if cand0.get("finishReason") and cand0.get("finishReason") not in ("STOP", "MAX_TOKENS"):
+        raise GeminiClientError(f"Gemini finish reason: {cand0.get('finishReason')}")
+
+    content = cand0.get("content") if isinstance(cand0.get("content"), dict) else None
     parts = content.get("parts") if isinstance(content, dict) else None
     if not isinstance(parts, list) or not parts:
         raise GeminiClientError("Gemini returned an empty content")

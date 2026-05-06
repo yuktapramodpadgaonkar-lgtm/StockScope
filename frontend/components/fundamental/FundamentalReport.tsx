@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import {
   fetchFundamentalAnalysis,
   type FundamentalAnalysisResponse,
@@ -65,32 +65,30 @@ function formatMetricValue(key: keyof FundamentalMetrics, n: number | null): str
 }
 
 type FundamentalReportProps = {
-  /** Initial symbol for the lookup input (loads on mount). */
+  /** Optional initial ticker text (does not fetch until Analyze). */
   defaultTicker?: string;
 };
 
-export function FundamentalReport({ defaultTicker = "AAPL" }: FundamentalReportProps) {
+export function FundamentalReport({ defaultTicker = "" }: FundamentalReportProps) {
   const [input, setInput] = useState(defaultTicker);
   const [llmChoice, setLlmChoice] = useState<"mistral" | "llama" | "gemini">("mistral");
-  const llmChoiceRef = useRef(llmChoice);
-  llmChoiceRef.current = llmChoice;
 
   const [report, setReport] = useState<FundamentalAnalysisResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async (symbol: string, choice?: "mistral" | "llama" | "gemini") => {
+  const load = useCallback(async (symbol: string) => {
     const sym = symbol.trim();
     if (!sym) {
       setError("Enter a ticker symbol.");
       return;
     }
-    const selected = choice ?? llmChoiceRef.current;
+    const selected = llmChoice;
     const provider =
       selected === "gemini" ? "gemini" : "ollama";
     const model =
       selected === "gemini"
-        ? "gemini-1.5-flash"
+        ? "gemini-3-flash-preview"
         : selected === "llama"
           ? "llama3.1:8b"
           : "mistral:7b";
@@ -105,11 +103,7 @@ export function FundamentalReport({ defaultTicker = "AAPL" }: FundamentalReportP
     } finally {
       setLoading(false);
     }
-  }, []);
-
-  useEffect(() => {
-    void load(defaultTicker, llmChoiceRef.current);
-  }, [defaultTicker, load]);
+  }, [llmChoice]);
 
   return (
     <div className="space-y-6">
@@ -124,8 +118,8 @@ export function FundamentalReport({ defaultTicker = "AAPL" }: FundamentalReportP
             onKeyDown={(e) => {
               if (e.key === "Enter") void load(input);
             }}
-            placeholder="e.g. AAPL"
-            className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-sm text-slate-100 outline-none ring-emerald-500/0 transition focus:ring-2 focus:ring-emerald-500/40"
+            placeholder="Select or enter a stock ticker (e.g. AAPL)"
+            className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-sm text-slate-100 outline-none ring-emerald-500/0 transition placeholder:text-slate-600 focus:ring-2 focus:ring-emerald-500/40"
             autoComplete="off"
             spellCheck={false}
           />
@@ -139,6 +133,9 @@ export function FundamentalReport({ defaultTicker = "AAPL" }: FundamentalReportP
           {loading ? "Loading…" : "Analyze"}
         </button>
       </div>
+      {loading && report && (
+        <p className="text-xs text-slate-500">Updating analysis…</p>
+      )}
 
       <label className="flex flex-col gap-1.5 sm:max-w-xs">
         <span className="text-xs font-medium uppercase tracking-wide text-slate-500">
@@ -168,7 +165,7 @@ export function FundamentalReport({ defaultTicker = "AAPL" }: FundamentalReportP
         </div>
       )}
 
-      {report && !loading && (
+      {report && (
         <div className="space-y-6">
           <header className="rounded-xl border border-slate-800 bg-slate-900/40 p-5 shadow-xl backdrop-blur">
             <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
