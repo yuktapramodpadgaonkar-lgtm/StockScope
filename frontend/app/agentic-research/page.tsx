@@ -7,6 +7,14 @@ import { postAgenticResearch, type AgenticResearchResponse } from "@/lib/agentic
 const PHASES = ["Planning…", "Fetching tools…", "Writing answer…"];
 const PHASE_DELAYS = [0, 3000, 9000]; // ms after loading starts
 
+const MODEL_OPTIONS = [
+  { value: "gemini",  label: "Gemini 2.0 Flash" },
+  { value: "llama",   label: "LLaMA 3.1 8B" },
+  { value: "mistral", label: "Mistral 7B" },
+] as const;
+
+type ModelChoice = "gemini" | "llama" | "mistral";
+
 export default function AgenticResearchPage() {
   const [ticker, setTicker] = useState("AAPL");
   const [secondary, setSecondary] = useState("");
@@ -14,6 +22,7 @@ export default function AgenticResearchPage() {
     "Summarize fundamentals and recent news themes with citations. No buy/sell instructions.",
   );
   const [sessionId, setSessionId] = useState("demo-session");
+  const [modelChoice, setModelChoice] = useState<ModelChoice>("llama");
   const [loading, setLoading] = useState(false);
   const [phaseIdx, setPhaseIdx] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -51,7 +60,7 @@ export default function AgenticResearchPage() {
         include_buy_sell: true,
         include_news: true,
         include_fundamental: true,
-        preferred_model: "gemini",
+        preferred_model: modelChoice,
         max_steps: 3,
       });
       setResult(data);
@@ -93,15 +102,29 @@ export default function AgenticResearchPage() {
             />
           </label>
         </div>
-        <label className="block text-sm font-medium text-gray-700">
-          Session id
-          <input
-            className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900"
-            value={sessionId}
-            onChange={(e) => setSessionId(e.target.value)}
-            maxLength={64}
-          />
-        </label>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="block text-sm font-medium text-gray-700">
+            Session id
+            <input
+              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900"
+              value={sessionId}
+              onChange={(e) => setSessionId(e.target.value)}
+              maxLength={64}
+            />
+          </label>
+          <label className="block text-sm font-medium text-gray-700">
+            AI model
+            <select
+              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900"
+              value={modelChoice}
+              onChange={(e) => setModelChoice(e.target.value as ModelChoice)}
+            >
+              {MODEL_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          </label>
+        </div>
         <label className="block text-sm font-medium text-gray-700">
           Question
           <textarea

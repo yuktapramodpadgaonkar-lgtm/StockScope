@@ -6,9 +6,18 @@ import { NewsSentimentReport } from "@/components/NewsSentimentReport";
 import { postNewsSentiment } from "@/lib/revati-api";
 import type { NewsSentimentResponse } from "@/lib/revati-types";
 
+const MODEL_OPTIONS = [
+  { value: "gemini", label: "Gemini 2.0 Flash" },
+  { value: "llama",  label: "LLaMA 3.1 8B" },
+  { value: "mistral", label: "Mistral 7B" },
+] as const;
+
+type ModelChoice = "gemini" | "llama" | "mistral";
+
 export default function NewsSentimentPage() {
   const [ticker, setTicker] = useState("AAPL");
   const [maxArticles, setMaxArticles] = useState(10);
+  const [modelChoice, setModelChoice] = useState<ModelChoice>("llama");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<NewsSentimentResponse | null>(null);
@@ -21,7 +30,7 @@ export default function NewsSentimentPage() {
     setLoading(true);
     setResult(null);
     try {
-      const data = await postNewsSentiment({ ticker: sym, max_articles: maxArticles, use_rag: true });
+      const data = await postNewsSentiment({ ticker: sym, max_articles: maxArticles, use_rag: true, model_name: modelChoice });
       setResult(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Request failed");
@@ -60,6 +69,18 @@ export default function NewsSentimentPage() {
           >
             {[5, 10, 15, 20].map((n) => (
               <option key={n} value={n}>{n}</option>
+            ))}
+          </select>
+        </label>
+        <label className="block text-sm font-medium text-gray-700">
+          AI model
+          <select
+            className="mt-1 block rounded-lg border border-gray-300 px-3 py-2 text-gray-900"
+            value={modelChoice}
+            onChange={(e) => setModelChoice(e.target.value as ModelChoice)}
+          >
+            {MODEL_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
             ))}
           </select>
         </label>
