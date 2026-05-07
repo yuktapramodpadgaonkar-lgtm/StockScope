@@ -46,7 +46,7 @@ class Settings(BaseSettings):
     rag_max_chunks_per_ticker: int = 600
     rag_rotate_bytes: int = 100 * 1024 * 1024
     sec_edgar_enabled: bool = True
-    sec_user_agent: str = ""
+    sec_user_agent: str = "StockScope student-project revatishailesh.pathrudkar@sjsu.edu"
     sec_filings_limit: int = 2
     sec_filing_max_download_chars: int = 200_000
     sec_cik_cache_hours: int = 168
@@ -71,10 +71,6 @@ class Settings(BaseSettings):
     ollama_llama_model: str = "llama3.1:8b"
     ollama_mistral_model: str = "mistral:7b"
 
-    groq_api_key: str = ""
-    groq_model: str = "llama3-8b-8192"
-    openrouter_api_key: str = ""
-    openrouter_model: str = "mistralai/mistral-7b-instruct"
     default_llm_provider: str = "gemini"  # gemini | llama | mistral
 
     finbert_enabled: bool = True

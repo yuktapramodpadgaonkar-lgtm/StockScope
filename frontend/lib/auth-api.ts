@@ -46,6 +46,19 @@ export async function apiLogin(email: string, password: string): Promise<LoginRe
   return res.json() as Promise<LoginResponse>;
 }
 
+/** POST /api/auth/register — creates account and returns a signed JWT. */
+export async function apiRegister(email: string, password: string): Promise<LoginResponse> {
+  const res = await fetch(`${getApiBase()}/api/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: email.trim(), password }),
+  });
+  if (!res.ok) {
+    throw new Error(await readErrorMessage(res));
+  }
+  return res.json() as Promise<LoginResponse>;
+}
+
 /** Optional: notify backend (stateless mock — safe to skip if offline). */
 export function apiLogoutFireAndForget(): void {
   void fetch(`${getApiBase()}/api/auth/logout`, { method: "POST" }).catch(() => {});

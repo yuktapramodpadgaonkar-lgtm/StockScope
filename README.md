@@ -301,7 +301,7 @@ Frontend (Next.js + TypeScript + Tailwind)
 | `/evaluation` | Multi-model comparison (Gemini / LLaMA / Mistral) |
 | `/login` | Authentication |
 
-> **Note:** Authentication is mocked for demo purposes. Any email/password is accepted and a session token is issued. No real user database or JWT signing is used.
+> **Note:** Authentication uses real JWT (HS256 via python-jose), a SQLite user store (`backend/data/users.db`), and bcrypt password hashing. Tokens expire after 24 hours. Use `POST /api/auth/register` to create an account and `POST /api/auth/login` to get a signed token.
 
 ---
 
