@@ -28,7 +28,7 @@ const TASK_OPTIONS: { value: EvalTask; label: string }[] = [
 ];
 
 const MODEL_LABELS: Record<string, string> = {
-  gemini: "Gemini 1.5 Flash",
+  gemini: "Gemini 2.0 Flash",
   llama: "LLaMA 3.1 8B",
   mistral: "Mistral 7B",
 };

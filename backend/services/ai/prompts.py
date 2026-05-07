@@ -572,10 +572,10 @@ Instructions:
 1. Provide a clear, factual 3-4 sentence response to the query.
 2. List exactly 3 key observations as bullet points.
 3. Do NOT give direct buy/sell recommendations.
-4. End with: "This is for educational purposes only and is not financial advice."
+4. The "answer" field MUST end with this exact sentence: "This is for educational purposes only and is not financial advice."
 
 Return ONLY valid JSON — no markdown fences, no extra text:
-{{"answer": "...", "bullets": ["...", "...", "..."]}}
+{{"answer": "...<your analysis>. This is for educational purposes only and is not financial advice.", "bullets": ["...", "...", "..."]}}
 """
 
 _TASK_HINTS = {
