@@ -40,7 +40,7 @@ export default function Home() {
           href="http://127.0.0.1:8000/docs"
           target="_blank"
           rel="noreferrer"
-          className="rounded-lg border border-teal-300 bg-white px-5 py-2.5 text-sm font-semibold text-teal-700 transition hover:bg-teal-50"
+          className="rounded-lg bg-teal-700 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-teal-700/25 transition hover:bg-teal-800 dark:bg-teal-600 dark:hover:bg-teal-500"
         >
           API Docs
         </a>
