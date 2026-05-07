@@ -46,6 +46,7 @@ type FundamentalReportProps = {
 export function FundamentalReport({ defaultTicker = "" }: FundamentalReportProps) {
   const [input, setInput] = useState(defaultTicker);
   const [llmChoice, setLlmChoice] = useState<"mistral" | "llama" | "gemini">("mistral");
+  const [includeRag, setIncludeRag] = useState(true);
   const [report, setReport] = useState<FundamentalAnalysisResponse | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -69,7 +70,12 @@ export function FundamentalReport({ defaultTicker = "" }: FundamentalReportProps
     setLoading(true);
     setError(null);
     try {
-      const data = await fetchFundamentalAnalysis(sym, true, provider, model);
+      const data = await fetchFundamentalAnalysis(sym, {
+        includeLlm: true,
+        includeRag,
+        provider,
+        model,
+      });
       setReport(data);
     } catch (e) {
       setReport(null);
@@ -77,7 +83,7 @@ export function FundamentalReport({ defaultTicker = "" }: FundamentalReportProps
     } finally {
       setLoading(false);
     }
-  }, [llmChoice]);
+  }, [llmChoice, includeRag]);
 
   useEffect(() => {
     setInput(defaultTicker);
@@ -110,8 +116,8 @@ export function FundamentalReport({ defaultTicker = "" }: FundamentalReportProps
             {loading ? "Analyzing..." : "Analyze"}
           </button>
         </div>
-        <div className="mt-4 max-w-md">
-          <label className="flex flex-col gap-1.5">
+        <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-start">
+          <label className="flex max-w-md flex-1 flex-col gap-1.5">
             <span className="text-xs font-medium uppercase tracking-wide text-slate-500">AI model</span>
             <select
               value={llmChoice}
@@ -124,6 +130,20 @@ export function FundamentalReport({ defaultTicker = "" }: FundamentalReportProps
             </select>
             <span className="text-xs text-slate-500">
               Each run requests an AI explanation from the selected provider; metrics stay deterministic.
+            </span>
+          </label>
+          <label className="flex cursor-pointer items-start gap-2 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2.5 text-sm text-slate-800">
+            <input
+              type="checkbox"
+              checked={includeRag}
+              onChange={(e) => setIncludeRag(e.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-400"
+            />
+            <span>
+              <span className="font-medium text-slate-900">Include SEC filing context</span>
+              <span className="mt-0.5 block text-xs font-normal text-slate-500">
+                Runs hybrid retrieval over ingested 10-K/10-Q/8-K excerpts when SEC EDGAR is configured in the backend.
+              </span>
             </span>
           </label>
         </div>
@@ -262,6 +282,58 @@ export function FundamentalReport({ defaultTicker = "" }: FundamentalReportProps
               </ul>
             </SectionCard>
           </div>
+
+          {(Array.isArray(report.rag_evidence) || report.rag_error) && (
+            <SectionCard
+              title="SEC filing context (RAG)"
+              subtitle="Retrieved excerpts from recent filings when backend SEC ingest is enabled."
+              className="border-sky-200 bg-sky-50/50"
+            >
+              {report.rag_error ? (
+                <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900" role="status">
+                  {report.rag_error}
+                </p>
+              ) : null}
+              {report.rag_evidence && report.rag_evidence.length > 0 ? (
+                <ul className="mt-3 space-y-3">
+                  {report.rag_evidence.map((ev, i) => (
+                    <li
+                      key={ev.chunk_id ?? `ev-${i}`}
+                      className="rounded-lg border border-slate-200 bg-white/80 p-3 text-sm text-slate-800"
+                    >
+                      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                        <span className="font-medium text-slate-900">{ev.title ?? "Filing excerpt"}</span>
+                        {ev.section_key ? (
+                          <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium uppercase text-slate-600">
+                            {ev.section_key}
+                          </span>
+                        ) : null}
+                        {ev.retrieval_score != null ? (
+                          <span className="text-xs tabular-nums text-slate-500">score {ev.retrieval_score}</span>
+                        ) : null}
+                      </div>
+                      {ev.url ? (
+                        <a
+                          href={ev.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="mt-1 inline-block text-xs text-teal-700 hover:underline"
+                        >
+                          Source link
+                        </a>
+                      ) : null}
+                      <p className="mt-2 text-xs leading-relaxed text-slate-600">{ev.text_preview}</p>
+                    </li>
+                  ))}
+                </ul>
+              ) : !report.rag_error ? (
+                <p className="text-sm text-slate-600">
+                  No filing chunks returned (SEC may be disabled or no recent items for this ticker). Metrics and AI text
+                  still use yfinance rules.
+                </p>
+              ) : null}
+            </SectionCard>
+          )}
 
           {(report.ai_summary || report.ai_error) && (
             <SectionCard

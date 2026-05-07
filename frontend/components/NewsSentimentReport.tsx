@@ -47,6 +47,24 @@ export function NewsSentimentReport({ data }: NewsSentimentReportProps) {
           Fallback mode used: live Finnhub feed unavailable, so sample articles were used.
         </p>
       ) : null}
+      {data.rag_retrieved != null || data.rag_error ? (
+        <div
+          className={`rounded border px-3 py-2 text-xs ${
+            data.rag_error
+              ? "border-amber-600/40 bg-amber-900/20 text-amber-200"
+              : "border-teal-500/30 bg-teal-950/30 text-teal-100"
+          }`}
+        >
+          <span className="font-semibold text-gray-200">RAG: </span>
+          {data.rag_error ? (
+            <span>Retrieval issue — themes may use headlines only. ({data.rag_error})</span>
+          ) : (
+            <span>
+              {data.rag_retrieved} news chunk{data.rag_retrieved === 1 ? "" : "s"} used to ground the theme prompt.
+            </span>
+          )}
+        </div>
+      ) : null}
 
       <div className="grid gap-3 sm:grid-cols-3">
         <SentimentBar label="Positive" value={agg.positive} color="bg-teal-500" />

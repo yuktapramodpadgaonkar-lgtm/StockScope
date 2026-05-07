@@ -40,11 +40,12 @@ This document describes what StockScope implements today versus what remains asp
 
 | Topic | Status |
 |-------|--------|
+| **Where RAG shows up** | **Buy/Sell** (`include_retrieval`), **Agentic Research** (`/api/agentic-research/run`), **News Sentiment** (`use_rag` on `POST /api/analysis/news-sentiment`; UI checkbox on the Chatbot page news panel), **Fundamentals** (`include_rag` on `GET /api/analysis/fundamental`; UI checkbox on the Fundamentals page). |
 | **Data source** | **Partial** — Chunks derived from news + filing-oriented ingest tied to Layer 1 / stubs (see [`app/rag/`](../backend/app/rag/)); not a hosted production corpus. |
 | **Chunking** | **Done (v1)** — Ingest modules produce structured chunks with metadata (ticker, source, `chunk_id`). |
 | **Retrieval** | **Hybrid (when enabled)** — [`hybrid_retriever.py`](../backend/app/rag/hybrid_retriever.py): BM25 + dense embeddings when HF token/index available; otherwise BM25-weighted behavior per settings. |
 | **Citations / grounding** | **Partial** — [`citation_checker.py`](../backend/app/rag/citation_checker.py) verifies citation ids against retrieved chunks; buy/sell prompts constrain LLM citation ids. Not full automated grounding against live filings for every answer. |
-| **“Advanced” RAG (GraphRAG / agentic)** | **Agentic RAG implemented (v1)** via `/api/agentic-research/run` (planner → tools → writer → critic). GraphRAG is not implemented. |
+| **“Advanced” RAG** | **GraphRAG is not implemented.** The advanced retrieval story here is **hybrid search + agentic orchestration** (tool use, evidence bundle, rule critic), not knowledge-graph traversal. **Agentic RAG (v1)** is `/api/agentic-research/run` (planner → tools → writer → critic). |
 
 ## Memory
 

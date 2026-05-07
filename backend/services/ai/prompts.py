@@ -53,6 +53,31 @@ Headlines (with sentiment label):
 {headlines}
 """
 
+NEWS_THEMES_RAG_PROMPT = """\
+{safety}
+{few_shot_examples}
+You are a financial analyst reviewing recent news for the stock ticker: {ticker}.
+
+You have (A) headlines with FinBERT-style sentiment labels and (B) retrieved news passages from a local hybrid search (BM25 + embeddings). Prefer (B) for concrete phrasing when it supports a theme; you may combine both.
+
+Identify the 3 most important recurring themes.
+Then write a 2-sentence market sentiment summary. If you reference specific claims tied to a passage, the summary or themes should stay consistent with the evidence (URLs are listed in the retrieved block).
+
+Rules:
+- Themes must be short noun phrases (3-6 words each), e.g. "AI infrastructure spending".
+- Summary must end with: "This is for educational purposes only."
+- Return ONLY valid JSON — no markdown fences, no extra text.
+
+JSON format:
+{{"themes": ["...", "...", "..."], "summary": "..."}}
+
+Retrieved news chunks (title | url | excerpt):
+{rag_block}
+
+Headlines (with sentiment label):
+{headlines}
+"""
+
 NEWS_THEMES_REPAIR_PROMPT = """\
 {safety}
 
@@ -66,11 +91,14 @@ Problem: {problem}
 Headlines provided (with sentiment label):
 {headlines}
 
+Retrieved news passages (title | url | excerpt; may be empty):
+{rag_block}
+
 Previous JSON output (fix issues; do not invent headlines):
 {previous}
 
 Instructions:
-- If there are no citations (URLs), do NOT claim \"reported\", \"headlines\", or \"articles say\" specific items.
+- If there are no citations (URLs in headlines or retrieved passages), do NOT claim \"reported\", \"headlines\", or \"articles say\" specific items.
 - In that case, write a cautious summary that explicitly says evidence is insufficient.
 - Always end summary with: \"This is for educational purposes only.\"
 - Return ONLY valid JSON:
@@ -177,6 +205,16 @@ def build_news_themes_prompt(ticker: str, headlines: str) -> str:
     )
 
 
+def build_news_themes_rag_prompt(ticker: str, headlines: str, rag_block: str) -> str:
+    return NEWS_THEMES_RAG_PROMPT.format(
+        safety=SAFETY_BLOCK,
+        few_shot_examples=_few_shots("news_themes"),
+        ticker=ticker.upper(),
+        rag_block=(rag_block or "(no retrieved passages)").strip(),
+        headlines=headlines,
+    )
+
+
 def build_news_themes_repair_prompt(
     *,
     ticker: str,
@@ -184,11 +222,14 @@ def build_news_themes_repair_prompt(
     previous: str,
     problem: str,
     has_citations: bool,
+    rag_block: str | None = None,
 ) -> str:
+    rb = (rag_block or "").strip() or "(none)"
     return NEWS_THEMES_REPAIR_PROMPT.format(
         safety=SAFETY_BLOCK,
         ticker=ticker.upper(),
         headlines=headlines,
+        rag_block=rb[:4000],
         previous=(previous or "")[:1500],
         problem=(problem or "")[:200],
         has_citations=str(bool(has_citations)).lower(),
@@ -542,7 +583,7 @@ def build_multi_model_comparison_prompt(task: str, ticker: str, query: str) -> s
     )
 
 
-# ── LLM-as-a-Judge ────────────────────────────────────────────────────────────
+# ── LLM-as-a-Judge (multi-model comparison) ───────────────────────────────────
 
 LLM_JUDGE_PROMPT = """\
 You are an impartial judge evaluating AI-generated financial analysis responses.

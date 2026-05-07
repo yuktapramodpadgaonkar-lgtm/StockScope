@@ -1,3 +1,6 @@
+import { getAccessToken } from "@/lib/auth";
+import { getApiBase } from "@/lib/auth-api";
+
 export type FundamentalMetrics = {
   market_cap: number | null;
   trailing_pe: number | null;
@@ -12,8 +15,14 @@ export type FundamentalMetrics = {
   dividend_yield_pct: number | null;
 };
 
-import { getAccessToken } from "@/lib/auth";
-import { getApiBase } from "@/lib/auth-api";
+export type RagEvidenceItem = {
+  chunk_id?: string | null;
+  title?: string | null;
+  url?: string | null;
+  section_key?: string | null;
+  text_preview: string;
+  retrieval_score?: number | null;
+};
 
 export type FundamentalAnalysisResponse = {
   ticker: string;
@@ -29,20 +38,33 @@ export type FundamentalAnalysisResponse = {
   ai_summary: string | null;
   ai_model: string | null;
   ai_error: string | null;
+  rag_evidence?: RagEvidenceItem[] | null;
+  rag_error?: string | null;
+};
+
+export type FundamentalFetchOptions = {
+  includeLlm?: boolean;
+  /** Ingest SEC filing chunks and return `rag_evidence` (optional narrative context). */
+  includeRag?: boolean;
+  provider?: string;
+  model?: string;
 };
 
 export async function fetchFundamentalAnalysis(
   ticker: string,
-  includeLlm = false,
-  provider?: string,
-  model?: string,
+  options: FundamentalFetchOptions = {},
 ): Promise<FundamentalAnalysisResponse> {
+  const { includeLlm = false, includeRag = false, provider, model } = options;
+
   const url = new URL(`${getApiBase()}/api/analysis/fundamental`);
   url.searchParams.set("ticker", ticker.trim());
   if (includeLlm) {
     url.searchParams.set("include_llm", "true");
     if (provider) url.searchParams.set("provider", provider);
     if (model) url.searchParams.set("model", model);
+  }
+  if (includeRag) {
+    url.searchParams.set("include_rag", "true");
   }
 
   const headers: HeadersInit = {};

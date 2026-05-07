@@ -34,4 +34,10 @@ export type NewsSentimentResponse = {
   citations: CitationItem[];
   disclaimer: string;
   fallback_used: boolean;
+  llm_model_used?: string | null;
+  llm_provider?: string | null;
+  llm_fallback_used?: boolean;
+  /** Set when hybrid news RAG ran (`use_rag` on request). */
+  rag_retrieved?: number | null;
+  rag_error?: string | null;
 };

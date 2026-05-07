@@ -8,6 +8,7 @@ live yfinance, LLM multi-model runs, and authed fundamental calls.
 Run from repo root:
   python backend/evaluation/run_batch_eval.py
   python backend/evaluation/run_batch_eval.py --category fundamental --live-fundamental
+  python backend/evaluation/run_batch_eval.py --category news_sentiment --live-news
   python backend/evaluation/run_batch_eval.py --live-orchestrator --max-cases 2
   python backend/evaluation/run_batch_eval.py --live-multi --max-cases 1
   python backend/evaluation/run_batch_eval.py --live-fundamental
@@ -251,6 +252,59 @@ def run_batch() -> int:
                             if key not in data:
                                 status, err = "fail", f"missing {key}"
                                 break
+            elif "schema_fundamental_rag_authed" in checks:
+                if not args.live_fundamental:
+                    status = "not_run"
+                    notes = "use --live-fundamental"
+                else:
+                    sym = str(inp.get("ticker") or "AAPL").upper()
+                    t0 = time.perf_counter()
+                    r = client.get(
+                        "/api/analysis/fundamental",
+                        params={
+                            "ticker": sym,
+                            "include_rag": "true",
+                            "include_llm": "false",
+                        },
+                        headers={"Authorization": f"Bearer {token}"},
+                    )
+                    latency_ms = (time.perf_counter() - t0) * 1000.0
+                    if r.status_code != 200:
+                        status, err = "fail", f"{r.status_code}"
+                    else:
+                        data = r.json()
+                        for key in ("ticker", "metrics", "verdict", "strengths", "risks"):
+                            if key not in data:
+                                status, err = "fail", f"missing {key}"
+                                break
+                        if status == "pass":
+                            ev = data.get("rag_evidence")
+                            if not isinstance(ev, list):
+                                status, err = "fail", "rag_evidence_not_list"
+            elif "news_sentiment_rag_live" in checks:
+                if not args.live_news:
+                    status = "not_run"
+                    notes = "use --live-news"
+                else:
+                    spec = inp.get("http") or {}
+                    path = spec.get("path") or "/api/analysis/news-sentiment"
+                    expected = int(spec.get("expected_status") or 200)
+                    t0 = time.perf_counter()
+                    r = client.post(
+                        path,
+                        params=spec.get("params") or {},
+                        json=spec.get("json") or {},
+                        headers=spec.get("headers") or {},
+                    )
+                    latency_ms = (time.perf_counter() - t0) * 1000.0
+                    if r.status_code != expected:
+                        status, err = "fail", f"expected {expected} got {r.status_code}"
+                    else:
+                        data = r.json()
+                        if "ticker" not in data or "aggregate_sentiment" not in data:
+                            status, err = "fail", "missing sentiment keys"
+                        elif not isinstance(data.get("rag_retrieved"), int):
+                            status, err = "fail", "rag_retrieved_not_int"
             elif "buy_sell_orchestrator" in checks:
                 if not args.live_orchestrator:
                     status = "not_run"
