@@ -62,7 +62,7 @@ class Settings(BaseSettings):
         default="",
         validation_alias=AliasChoices("GEMINI_API_KEY", "gemini_api_key"),
     )
-    gemini_model: str = "gemini-1.5-flash"
+    gemini_model: str = "gemini-2.0-flash"
 
     ollama_base_url: str = Field(
         default="http://localhost:11434",

@@ -19,7 +19,7 @@ The system integrates market data, financial fundamentals, news sentiment, and c
 
 | Role | Model | Provider |
 |------|-------|----------|
-| Primary LLM | Gemini 1.5 Flash | Google AI REST API |
+| Primary LLM | Gemini 2.0 Flash | Google AI REST API |
 | Local fallback 1 | LLaMA 3.1 8B | Ollama (local) |
 | Local fallback 2 | Mistral 7B | Ollama (local) |
 | Sentiment | FinBERT (ProsusAI/finbert) | HuggingFace Inference API |
@@ -304,6 +304,60 @@ Frontend (Next.js + TypeScript + Tailwind)
 | `/login` | Authentication |
 
 > **Note:** Authentication uses real JWT (HS256 via python-jose), a SQLite user store (`backend/data/users.db`), and bcrypt password hashing. Tokens expire after 24 hours. Use `POST /api/auth/register` to create an account and `POST /api/auth/login` to get a signed token.
+
+---
+
+## Demo Walkthrough
+
+Follow this sequence to show every major feature in ~10 minutes.
+
+### 1. Sign up and log in
+- Open **http://localhost:3000/signup** → create an account
+- You are redirected to **http://localhost:3000/login** → sign in
+- AuthGate grants access to all protected pages; token expires in 24 h
+
+### 2. News Sentiment — live Finnhub + FinBERT
+- Go to **`/news-sentiment`**
+- Ticker: `AAPL`, Max articles: 10 → click **Analyse**
+- Shows: per-article FinBERT sentiment badges, positive/neutral/negative bars, LLM-extracted themes, citations
+- The "AI:" badge confirms which model generated themes (Gemini 2.0 Flash → LLaMA → Mistral fallback chain)
+
+### 3. Agentic Research — plan → tools → critic
+- Go to **`/agentic-research`**
+- Ticker: `NVDA`, Question: `Summarize fundamentals and recent news themes with citations.`
+- Watch the phase indicator: **Planning → Fetching tools → Writing answer**
+- Result shows: plan steps used, answer grounded on evidence, citation list, `critic_passed` status, `repair_attempted` flag, memory profile
+- Try a second query for the same session — the memory profile updates with your ticker history
+
+### 4. Fundamental Analysis — metrics + LLM + RAG
+- Go to **`/fundamentals`**
+- Ticker: `MSFT` → toggle **Analyze with AI** + enable **Include RAG** → click Analyze
+- Shows: P/E, ROE, margins, debt/equity, strengths/risks verdict, AI narrative, and `rag_evidence` excerpts from pre-ingested documents
+- Change model selector (Gemini / LLaMA / Mistral) to compare narrative styles
+
+### 5. Model Comparison — LLM-as-judge
+- Go to **`/evaluation`**
+- Task: `sentiment`, Ticker: `AAPL`, Query: `What is the current market sentiment for AAPL?`
+- Click **Run comparison** — all three models run in parallel
+- Gemini acts as impartial judge: scores each response 1–5 on relevance, clarity, safety
+- Summary table shows latency, citation count, safety pass/fail, and judge scores side by side
+
+### 6. Chatbot — agentic pipeline with safety gate
+- Go to **`/chatbot`**
+- Ask: `What are the key fundamentals and recent news for TSLA?` → observe citations and model badge
+- Ask: `Should I buy TSLA right now?` → safety gate fires, `detected_intent: financial_advice_rejected`
+- Sidebar shows conversation threads; `/history` shows saved sessions with model metadata
+
+### 7. Eval rubric (for reviewers)
+```bash
+# Static + market + fundamental (39/39 pass, 0 fail)
+python backend/evaluation/run_batch_eval.py --live-market-data --live-fundamental
+
+# Live LLM categories (requires working Gemini key)
+python backend/evaluation/run_batch_eval.py --live-news --live-chat
+python backend/evaluation/run_batch_eval.py --category agentic_rag --live-agentic
+```
+Results written to `backend/evaluation/results/` as CSV + JSON.
 
 ---
 

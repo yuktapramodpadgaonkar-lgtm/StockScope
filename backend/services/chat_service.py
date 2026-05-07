@@ -377,7 +377,7 @@ def handle_chat_query(
             if tool == "fundamental":
                 sym = str(args.get("ticker") or (tickers[0] if tickers else "AAPL")).upper()
                 rep = get_fundamental_report(sym)
-                step_bundles.append(("fundamental", {"tool": "fundamental", "report": rep}))
+                step_bundles.append(("fundamental", {"tool": "fundamental", "report": rep.model_dump(mode="json")}))
                 _add_citation(f"{sym} fundamentals (yfinance)", f"https://finance.yahoo.com/quote/{sym}", "yfinance", "")
                 log_tool_call(tool_name="chat.fundamental", input_summary=f"ticker={sym}", output_summary="ok", latency_ms=None, error=None)
             elif tool == "news_sentiment":
