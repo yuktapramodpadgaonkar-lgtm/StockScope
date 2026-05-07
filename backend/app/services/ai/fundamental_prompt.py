@@ -35,6 +35,63 @@ JSON report:
 Now write your concise educational explanation following the rules above."""
 
 
+def build_fundamental_rag_prompt(report: dict, evidence_block: str) -> str:
+    """
+    Explain deterministic JSON plus retrieved SEC filing excerpts. Only cite claims supported
+    by the JSON or the evidence block (URLs/titles identify filings).
+    """
+    payload = json.dumps(report, indent=2, default=str)
+    ev = (evidence_block or "").strip() or "(No filing passages retrieved; rely on JSON only.)"
+
+    return f"""You are helping a beginner understand a stock research snapshot with optional SEC filing context.
+{_few_report()}
+Rules (must follow):
+- Use ONLY information present in the JSON report below OR in the "Filing evidence" section. Do not invent metrics or events not supported by those sources.
+- If the filing block is empty or says none retrieved, explain using the JSON only.
+- When you reference filing narrative, keep it high-level and consistent with the excerpt; do not quote long passages.
+- Do NOT tell the reader to buy, sell, or hold.
+- Target under ~300 words: tie strengths/risks from the JSON to themes in the filing excerpts where helpful.
+- Tone: educational and cautious; data may be stale — verify independently.
+- End with a short note that this is for learning and not financial advice.
+
+Filing evidence (retrieved chunks; title | url | excerpt):
+{ev}
+
+JSON report:
+{payload}
+
+Now write your concise educational explanation following the rules above."""
+
+
+def build_fundamental_rag_repair_prompt(
+    *, report: dict, evidence_block: str, previous_text: str, problem: str
+) -> str:
+    payload = json.dumps(report, indent=2, default=str)
+    ev = (evidence_block or "").strip()
+    prev = (previous_text or "").strip()
+    if len(prev) > 1800:
+        prev = prev[:1800] + "…"
+    return f"""You are rewriting an educational explanation that may use filing excerpts plus a fundamentals JSON snapshot.
+
+Problem: {problem}
+
+Rules (must follow):
+- Use ONLY information in the JSON and/or the filing evidence block. Remove unsupported numeric or factual claims.
+- Do NOT give buy/sell/hold instructions.
+- Keep under ~220 words. Output plain text only (no JSON).
+
+Previous explanation:
+{prev}
+
+Filing evidence:
+{ev}
+
+JSON report:
+{payload}
+
+Now rewrite the explanation."""
+
+
 def build_fundamental_repair_prompt(*, report: dict, previous_text: str, problem: str) -> str:
     """
     Second-pass rewrite: remove unsupported numeric/factual claims.

@@ -18,6 +18,10 @@ class NewsSentimentRequest(BaseModel):
         default=None,
         description="LLM for theme generation: gemini | llama | mistral",
     )
+    use_rag: bool = Field(
+        default=True,
+        description="If true, ingest news into the local chunk store, hybrid-retrieve top chunks, and ground the LLM themes prompt on retrieved text + URLs.",
+    )
 
 
 class AggregateSentiment(BaseModel):
@@ -57,3 +61,8 @@ class NewsSentimentResponse(BaseModel):
     llm_model_used: str | None = None
     llm_provider: str | None = None
     llm_fallback_used: bool = False
+    rag_retrieved: int | None = Field(
+        default=None,
+        description="Number of news chunks retrieved for LLM grounding (when use_rag).",
+    )
+    rag_error: str | None = Field(default=None, description="Set when RAG ingest/retrieve fails; LLM may still run on headlines only.")

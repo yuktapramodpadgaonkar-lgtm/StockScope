@@ -2,25 +2,23 @@
 Multi-model comparison endpoint.
 
 Runs the same task/prompt through Gemini, LLaMA, and Mistral independently
-and returns latency, citation count, and safety status for each.
+and returns latency, citation count, safety status, heuristic metrics, and optional LLM judge scores.
 """
 
 from __future__ import annotations
 
+import json
+import logging
 import time
 from typing import Any, Literal
 
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
-import json
-import logging
-
 from app.observability.jsonl_audit import log_model_call
 from services.ai.llm_service import LLMService
-from services.ai.prompts import build_multi_model_comparison_prompt
-from services.ai.response_metrics import build_response_metrics
 from services.ai.prompts import build_llm_judge_prompt, build_multi_model_comparison_prompt
+from services.ai.response_metrics import build_response_metrics
 
 logger = logging.getLogger(__name__)
 
@@ -120,6 +118,7 @@ def _call_single_model(
 
 # ── LLM Judge ────────────────────────────────────────────────────────────────
 
+
 def _run_judge(
     task: str,
     ticker: str,
@@ -179,7 +178,7 @@ def _run_judge(
 def compare_models(body: CompareRequest) -> CompareResponse:
     """
     Run the same task prompt through Gemini, LLaMA, and Mistral.
-    Gemini then acts as judge, scoring each response on relevance, clarity, and safety.
+    Attaches heuristic metrics per model; Gemini then judges each response on relevance, clarity, and safety.
     """
     ticker = body.ticker.strip().upper()
     query = body.query.strip()

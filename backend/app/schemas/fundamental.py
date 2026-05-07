@@ -3,6 +3,17 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 
+class RagEvidenceItem(BaseModel):
+    """One retrieved filing chunk used for optional fundamental RAG narrative."""
+
+    chunk_id: str | None = None
+    title: str | None = None
+    url: str | None = None
+    section_key: str | None = None
+    text_preview: str = Field(..., description="Truncated chunk text for UI / transparency")
+    retrieval_score: float | None = None
+
+
 class FundamentalMetrics(BaseModel):
     market_cap: float | None = None
     trailing_pe: float | None = None
@@ -36,4 +47,12 @@ class FundamentalAnalysisResponse(BaseModel):
     ai_error: str | None = Field(
         default=None,
         description="Set when include_llm=true but the LLM call failed; deterministic fields are still valid.",
+    )
+    rag_evidence: list[RagEvidenceItem] | None = Field(
+        default=None,
+        description="Retrieved SEC filing chunks when include_rag=true (optional narrative context).",
+    )
+    rag_error: str | None = Field(
+        default=None,
+        description="Set when include_rag=true but ingest/retrieve failed; deterministic report is still valid.",
     )

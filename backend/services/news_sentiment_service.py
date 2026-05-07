@@ -28,7 +28,14 @@ from app.schemas.news_sentiment import (
     SentimentLabel,
 )
 from services.ai.llm_service import LLMService
-from services.ai.prompts import build_news_themes_prompt, build_news_themes_repair_prompt
+from app.rag import ingest_news_chunks, retrieve_chunks
+from app.rag.embedding_index import sync_embeddings_for_ticker
+from app.rag.store import load_chunks
+from services.ai.prompts import (
+    build_news_themes_prompt,
+    build_news_themes_rag_prompt,
+    build_news_themes_repair_prompt,
+)
 from services.history_service import save_research_run
 
 logger = logging.getLogger(__name__)
@@ -218,10 +225,85 @@ def _classify_finbert_batch(texts: list[str]) -> list[SentimentLabel]:
 _FALLBACK_THEMES = ["earnings expectations", "analyst commentary", "macro positioning"]
 
 
+def _news_bundle_for_rag(sym: str, enriched: list[dict[str, Any]]) -> dict[str, Any]:
+    """Minimal Layer1-shaped `news_and_sentiment` payload for `ingest_news_chunks`."""
+    items: list[dict[str, Any]] = []
+    for a in enriched:
+        items.append(
+            {
+                "title": str(a.get("headline") or "").strip(),
+                "summary": str(a.get("summary") or "").strip(),
+                "source": str(a.get("source") or "news"),
+                "published": str(a.get("published_at") or ""),
+                "url": str(a.get("url") or ""),
+            }
+        )
+    return {
+        "news_and_sentiment": {
+            "headlines": {
+                "ticker": sym,
+                "source": "news_sentiment_api",
+                "items": items,
+            }
+        }
+    }
+
+
+def _format_news_rag_block(retrieved: list[dict[str, Any]]) -> str:
+    lines: list[str] = []
+    for r in retrieved:
+        title = str(r.get("title") or "").strip() or "(untitled)"
+        url = str(r.get("url") or "").strip()
+        excerpt = str(r.get("text") or "").strip().replace("\n", " ")[:700]
+        lines.append(f"- {title} | {url or 'n/a'} | {excerpt}")
+    return "\n".join(lines) if lines else "(no passages)"
+
+
+def _run_news_rag_pipeline(
+    sym: str,
+    enriched: list[dict[str, Any]],
+    *,
+    top_k: int = 8,
+) -> tuple[list[dict[str, Any]], str | None]:
+    """
+    Ingest Finnhub-class articles into the chunk store, sync embeddings, hybrid-retrieve news chunks.
+    Returns (retrieved_rows, error_message_or_none).
+    """
+    try:
+        bundle = _news_bundle_for_rag(sym, enriched)
+        ingest_news_chunks(sym, bundle)
+        ticker_rows = [
+            c
+            for c in load_chunks()
+            if str(c.get("ticker") or "").upper() == sym
+        ]
+        sync_embeddings_for_ticker(sym, ticker_rows)
+        headlines_joined = " ".join(
+            str(a.get("headline") or "") for a in enriched[:12]
+        )
+        q = (
+            f"recent news sentiment themes risks catalysts analyst commentary for {sym}. "
+            f"{headlines_joined}"[:2000]
+        )
+        retrieved = retrieve_chunks(
+            ticker=sym,
+            query=q,
+            top_k=top_k,
+            doc_types=["news"],
+            max_age_days=None,
+        )
+        return retrieved, None
+    except Exception as e:  # noqa: BLE001
+        logger.warning("News RAG pipeline failed for %s: %s", sym, e)
+        return [], str(e)[:500]
+
+
 def _generate_themes_and_summary(
     ticker: str,
     enriched_articles: list[dict[str, Any]],
     preferred_model: str,
+    *,
+    rag_block: str | None = None,
 ) -> tuple[list[str], str, str | None, str | None, bool]:
     """
     Use LLMService to extract themes and write a narrative summary.
@@ -233,7 +315,11 @@ def _generate_themes_and_summary(
         f"- [{a.get('sentiment', 'neutral')}] {a.get('headline', '')}"
         for a in enriched_articles[:10]
     )
-    prompt = build_news_themes_prompt(ticker, headlines_text)
+    rb = (rag_block or "").strip()
+    if rb and rb != "(no passages)":
+        prompt = build_news_themes_rag_prompt(ticker, headlines_text, rb)
+    else:
+        prompt = build_news_themes_prompt(ticker, headlines_text)
     result = _llm.generate_response(prompt, preferred_model=preferred_model)
 
     if result.error or not result.response:
@@ -266,7 +352,10 @@ def _generate_themes_and_summary(
         themes = _FALLBACK_THEMES
         summary = _build_fallback_summary(ticker, enriched_articles)
 
-    has_citations = any((a.get("url") or "").strip().startswith("http") for a in enriched_articles)
+    rag_urls = "http" in (rag_block or "").lower()
+    has_citations = any(
+        (a.get("url") or "").strip().startswith("http") for a in enriched_articles
+    ) or rag_urls
     if (not has_citations) and _NEWS_CLAIM_RE.search(summary or ""):
         # Critic: summary claims news specifics without citations. Attempt a single repair; then fallback.
         repair_prompt = build_news_themes_repair_prompt(
@@ -275,6 +364,7 @@ def _generate_themes_and_summary(
             previous=result.response or "",
             problem="news_claim_without_citations",
             has_citations=False,
+            rag_block=rb or None,
         )
         repair = _llm.generate_response(repair_prompt, preferred_model=preferred_model)
         if not repair.error and repair.response:
@@ -349,6 +439,8 @@ def build_news_sentiment_report(
     date_to: str | None,
     max_articles: int = 10,
     model_name: str | None = None,
+    *,
+    use_rag: bool = True,
 ) -> NewsSentimentResponse:
     """
     Build a structured news sentiment report for *ticker*.
@@ -393,10 +485,20 @@ def build_news_sentiment_report(
     articles = [NewsArticleItem.model_validate(a) for a in enriched]
     aggregate = _aggregate_counts(articles)
 
+    rag_retrieved: int | None = None
+    rag_error: str | None = None
+    rag_block: str | None = None
+    if use_rag and enriched:
+        retrieved, rag_err = _run_news_rag_pipeline(sym, enriched)
+        rag_retrieved = len(retrieved)
+        rag_error = rag_err
+        if retrieved:
+            rag_block = _format_news_rag_block(retrieved)
+
     # Step 3: LLM themes + summary
     preferred = (model_name or "gemini").strip().lower()
     themes, summary, llm_model, llm_provider, llm_fallback = (
-        _generate_themes_and_summary(sym, enriched, preferred)
+        _generate_themes_and_summary(sym, enriched, preferred, rag_block=rag_block)
     )
 
     citations = [
@@ -429,4 +531,6 @@ def build_news_sentiment_report(
         llm_model_used=llm_model,
         llm_provider=llm_provider,
         llm_fallback_used=llm_fallback or False,
+        rag_retrieved=rag_retrieved,
+        rag_error=rag_error,
     )

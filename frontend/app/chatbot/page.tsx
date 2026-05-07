@@ -21,6 +21,7 @@ export default function ChatbotPage() {
   const [sentiment, setSentiment] = useState<NewsSentimentResponse | null>(null);
   const [sentLoading, setSentLoading] = useState(false);
   const [sentError, setSentError] = useState<string | null>(null);
+  const [useRag, setUseRag] = useState(true);
 
   const refreshHistory = useCallback(async () => {
     try {
@@ -47,6 +48,7 @@ export default function ChatbotPage() {
         ticker: sym,
         date_from: dateFrom || null,
         date_to: dateTo || null,
+        use_rag: useRag,
       });
       setSentiment(data);
     } catch (e) {
@@ -54,7 +56,7 @@ export default function ChatbotPage() {
     } finally {
       setSentLoading(false);
     }
-  }, [ticker, dateFrom, dateTo]);
+  }, [ticker, dateFrom, dateTo, useRag]);
 
   const threads: ChatHistoryItem[] = history?.chat_history ?? [];
 
@@ -98,7 +100,18 @@ export default function ChatbotPage() {
 
           <section className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm">
             <h2 className="text-sm font-semibold text-slate-900">News sentiment</h2>
-            <p className="mt-1 text-xs text-slate-600">Run a sentiment pass on a ticker (same API as before).</p>
+            <p className="mt-1 text-xs text-slate-600">
+              Run a sentiment pass on a ticker. Enable RAG to ground theme summaries on hybrid-retrieved news chunks.
+            </p>
+            <label className="mt-3 flex cursor-pointer items-center gap-2 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                checked={useRag}
+                onChange={(e) => setUseRag(e.target.checked)}
+                className="h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500/30"
+              />
+              <span>Use RAG evidence</span>
+            </label>
             <div className="mt-4 flex flex-wrap gap-2">
               <input
                 value={ticker}

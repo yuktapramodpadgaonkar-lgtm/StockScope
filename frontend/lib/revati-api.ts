@@ -61,6 +61,8 @@ export type NewsSentimentRequestBody = {
   date_from?: string | null;
   date_to?: string | null;
   max_articles?: number;
+  /** Hybrid ingest + retrieve to ground theme LLM on chunk text + URLs. */
+  use_rag?: boolean;
 };
 
 export async function postNewsSentiment(body: NewsSentimentRequestBody): Promise<NewsSentimentResponse> {
@@ -72,6 +74,7 @@ export async function postNewsSentiment(body: NewsSentimentRequestBody): Promise
       date_from: body.date_from ?? null,
       date_to: body.date_to ?? null,
       max_articles: body.max_articles ?? 10,
+      use_rag: body.use_rag ?? true,
     }),
     cache: "no-store",
   });

@@ -311,6 +311,21 @@
     "cost": "optional_live"
   },
   {
+    "id": "rub-090",
+    "category": "fundamental",
+    "input": {
+      "ticker": "AAPL",
+      "requires_auth": true,
+      "include_rag": true
+    },
+    "expected_behavior": "Authed fundamental with include_rag=true returns rag_evidence list (filing RAG path exercised; may be empty if SEC ingest disabled)",
+    "checks": [
+      "schema_fundamental_rag_authed"
+    ],
+    "models_to_run": [],
+    "cost": "optional_live"
+  },
+  {
     "id": "rub-019",
     "category": "buy_sell",
     "input": {
@@ -606,6 +621,30 @@
     "checks": [
       "http_status",
       "json_non_empty"
+    ],
+    "models_to_run": [],
+    "cost": "network_optional"
+  },
+  {
+    "id": "rub-091",
+    "category": "news_sentiment",
+    "input": {
+      "http": {
+        "method": "POST",
+        "path": "/api/analysis/news-sentiment",
+        "params": {},
+        "json": {
+          "ticker": "MSFT",
+          "max_articles": 4,
+          "use_rag": true
+        },
+        "headers": {},
+        "expected_status": 200
+      }
+    },
+    "expected_behavior": "News sentiment with use_rag=true returns rag_retrieved as int (hybrid news RAG path exercised)",
+    "checks": [
+      "news_sentiment_rag_live"
     ],
     "models_to_run": [],
     "cost": "network_optional"

@@ -40,18 +40,31 @@ Fallback order (per request): Gemini → LLaMA → Mistral. All LLM calls are ha
 - BUY / HOLD / SELL with confidence score
 - LLM narrative explanation of the deterministic score (Gemini → LLaMA → Mistral)
 - Agent pipeline: Planner–Executor–Critic
-- RAG citations from news and SEC filings
+- **RAG:** optional hybrid retrieval (BM25 + embeddings) over ingested **news + SEC filing** chunks; surfaced as citations in the report when `include_retrieval` is enabled
+
+### 2b. Retrieval (RAG) across the product
+
+**RAG is available in:**
+
+- **Buy/Sell** — `include_retrieval` on `/api/buy-sell/analyze/...` (news + filings in the local chunk store)
+- **Agentic Research** — `/api/agentic-research/run` (planner picks tools; writer grounded on evidence + citations)
+- **News Sentiment** — `use_rag` on `POST /api/analysis/news-sentiment` (ingest headlines → hybrid retrieve → ground the theme LLM); **UI:** checkbox on the Chatbot page’s *News sentiment* panel
+- **Fundamentals** — `include_rag` on `GET /api/analysis/fundamental` (optional SEC filing excerpts for the narrative); **UI:** checkbox on the Fundamentals page
+
+**GraphRAG is not implemented.** The “advanced” retrieval story here is **hybrid search (BM25 + dense embeddings)** plus **agentic** orchestration (tool use + critic), not knowledge-graph RAG.
 
 ### 3. Fundamental Analysis
 - yfinance metrics: P/E, ROE, margins, debt/equity, growth
 - Rule-based health verdict (strengths + risks)
 - Optional LLM plain-English explanation via `include_llm=true` (Ollama Mistral/LLaMA or Gemini)
+- Optional **`include_rag=true`**: ingest/recent SEC filing chunks for `rag_evidence` and (when `include_llm`) filing-grounded AI text (requires `SEC_USER_AGENT` / EDGAR when enabled)
 
 ### 4. News Sentiment Analysis
 - Finnhub news fetch (falls back to mock data when key absent)
 - FinBERT classification per article (keyword heuristic fallback)
 - LLM theme extraction and narrative summary
 - Citations for all articles
+- Optional **`use_rag`**: local hybrid retrieval over news chunks to ground themes/summary (HF token improves dense retrieval)
 
 ### 5. Chatbot
 - Intent detection: stock_explanation, sentiment_question, comparison_question, history_lookup, unknown
@@ -66,7 +79,7 @@ Fallback order (per request): Gemini → LLaMA → Mistral. All LLM calls are ha
 - Frontend: `/evaluation` — dropdown task selector, ticker input, side-by-side results table
 
 ### 7. Evaluation rubric harness
-- **`backend/evaluation/eval_set.json`** — **89** cases (fundamental, buy/sell, news, chat, market movers, safety, auth, citations, memory, multi-model incl. `rub-087`–`rub-089`, **agentic chat** `rub-084`–`rub-086`, **agentic RAG** `rub-061`–`rub-075`)
+- **`backend/evaluation/eval_set.json`** — **91** cases (fundamental, buy/sell, news, chat, market movers, safety, auth, citations, memory, multi-model incl. `rub-087`–`rub-089`, **agentic chat** `rub-084`–`rub-086`, **agentic RAG** `rub-061`–`rub-075`, **news RAG** `rub-091`, **fundamental RAG** `rub-090`)
 - **`backend/evaluation/run_batch_eval.py`** — batch runner with optional `--live-fundamental`, `--live-news`, `--live-market-data`, `--live-orchestrator`, `--live-multi`; writes CSV/JSON under `backend/evaluation/results/` (gitignored)
 - **`backend/evaluation/run_eval.py`** — buy/sell agent pipeline smoke eval (yfinance; subsets via `--max-cases`)
 - **Structured logs** — append-only `backend/logs/model_calls.jsonl` and `backend/logs/tool_calls.jsonl` (gitignored)
@@ -181,6 +194,8 @@ The `/fundamentals` page has an **Analyze with AI** button that calls `include_l
 
 If the LLM fails, deterministic metrics still load (see `ai_error` in the API response).
 
+**API:** `GET /api/analysis/fundamental?ticker=AAPL&include_rag=true` returns filing **`rag_evidence`** when SEC ingest is configured; add **`include_llm=true`** (and optional **`preferred_model`** = `gemini` \| `llama` \| `mistral`) so the AI summary can use those excerpts. See **Fundamental analysis with SEC RAG** under API examples below.
+
 ### 3. Frontend
 
 ```bash
@@ -199,7 +214,7 @@ Open **http://localhost:3000** — e.g. `/market-movers`, `/fundamentals`, `/cha
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/api/buy-sell/analyze/{ticker}` | Full buy/sell analysis with LLM review |
-| GET | `/api/analysis/fundamental?ticker=AAPL` | Fundamental analysis + optional LLM summary |
+| GET | `/api/analysis/fundamental` | Fundamental analysis (Bearer auth). Query: `ticker`, optional `include_llm`, `include_rag`, `preferred_model` |
 | POST | `/api/analysis/news-sentiment` | News sentiment + FinBERT + LLM themes |
 | POST | `/api/chat/query` | Chatbot query |
 | GET | `/api/history` | Chat and research history |
@@ -219,6 +234,26 @@ curl -X POST http://127.0.0.1:8000/api/evaluation/compare-models \
 
 ```bash
 curl "http://127.0.0.1:8000/api/buy-sell/analyze/AAPL?include_llm_review=true"
+```
+
+### Fundamental analysis with SEC RAG (`include_rag`)
+
+Requires **Bearer token** (same login as the Fundamentals UI). Set **`SEC_USER_AGENT`** (and optionally `SEC_EDGAR_ENABLED=true`) in `backend/.env` for real filing text; otherwise `rag_evidence` may be empty.
+
+```bash
+# 1) Obtain token (use your app’s demo user or a registered account)
+TOKEN=$(curl -s -X POST http://127.0.0.1:8000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"eval@stockscope.edu","password":"class-demo"}' \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
+
+# 2) Filing RAG only (deterministic metrics + rag_evidence; no AI summary)
+curl -s "http://127.0.0.1:8000/api/analysis/fundamental?ticker=AAPL&include_rag=true&include_llm=false" \
+  -H "Authorization: Bearer $TOKEN" | python3 -m json.tool | head -80
+
+# 3) Filing RAG + AI summary (grounds narrative on metrics + excerpts when evidence exists)
+curl -s "http://127.0.0.1:8000/api/analysis/fundamental?ticker=AAPL&include_rag=true&include_llm=true&preferred_model=gemini" \
+  -H "Authorization: Bearer $TOKEN" | python3 -m json.tool | head -80
 ```
 
 ---
