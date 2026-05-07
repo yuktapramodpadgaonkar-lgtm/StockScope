@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Badge } from "@/components/ui/Badge";
@@ -10,6 +9,7 @@ import { MetricCard } from "@/components/ui/MetricCard";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import {
   fetchBuySellReport,
+  type BuySellModelChoice,
   type BuySellReport,
   type Recommendation,
 } from "@/lib/buy-sell-api";
@@ -64,10 +64,14 @@ const BS_PHASES = ["Fetching data…", "Scoring…", "Writing explanation…"];
 const BS_PHASE_DELAYS = [0, 4000, 10000];
 
 export function BuySellReportView() {
-  const [ticker, setTicker] = useState("AAPL");
-  const [inputValue, setInputValue] = useState("AAPL");
+  const [ticker, setTicker] = useState("");
+  const [inputValue, setInputValue] = useState("");
+  const [llmChoice, setLlmChoice] = useState<BuySellModelChoice>("gemini");
+  const [includeLlmReview, setIncludeLlmReview] = useState(true);
+  const [includeRetrieval, setIncludeRetrieval] = useState(false);
   const [report, setReport] = useState<BuySellReport | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
   const [phaseIdx, setPhaseIdx] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -88,12 +92,24 @@ export function BuySellReportView() {
   useEffect(() => () => clearPhaseTimers(), []);
 
   const load = useCallback(async (sym: string) => {
+    const normalized = sym.trim().toUpperCase();
+    if (!normalized) {
+      setError("Enter a ticker symbol.");
+      return;
+    }
+    setHasSearched(true);
+    setTicker(normalized);
     setLoading(true);
     setPhaseIdx(0);
     setError(null);
     startPhaseTimers();
     try {
-      const data = await fetchBuySellReport(sym);
+      const data = await fetchBuySellReport(normalized, {
+        includeLlmReview,
+        includeRetrieval,
+        useAgentPipeline: true,
+        preferredModel: llmChoice,
+      });
       setReport(data);
     } catch (e) {
       setReport(null);
@@ -103,11 +119,7 @@ export function BuySellReportView() {
       setLoading(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    void load(ticker);
-  }, [load, ticker]);
+  }, [includeLlmReview, includeRetrieval, llmChoice]);
 
   const bullBear = useMemo(() => {
     if (!report) return { bullish: [] as string[], bearish: [] as string[] };
@@ -124,6 +136,15 @@ export function BuySellReportView() {
     return { bullish, bearish };
   }, [report]);
 
+  const citationGroups = useMemo(() => {
+    if (!report) {
+      return { layer1: [] as BuySellReport["citations"], rag: [] as BuySellReport["citations"] };
+    }
+    const layer1 = report.citations.filter((c) => c.id.startsWith("layer1-"));
+    const rag = report.citations.filter((c) => !c.id.startsWith("layer1-"));
+    return { layer1, rag };
+  }, [report]);
+
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="mx-auto max-w-6xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
@@ -136,32 +157,59 @@ export function BuySellReportView() {
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();
-                    const sym = inputValue.trim().toUpperCase();
-                    if (sym) setTicker(sym);
+                    void load(inputValue);
                   }}
-                  className="flex gap-1"
+                  className="flex items-end gap-2"
                 >
-                  <input
-                    value={inputValue}
-                    onChange={(e) => setInputValue(e.target.value.toUpperCase())}
-                    placeholder="AAPL"
-                    maxLength={10}
-                    className="w-24 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-mono font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-slate-400"
-                  />
-                  <button
-                    type="submit"
-                    disabled={loading || !inputValue.trim()}
-                    className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:opacity-50"
-                  >
-                    {loading ? BS_PHASES[phaseIdx] : "Analyze"}
-                  </button>
+                  <label className="flex min-w-[130px] flex-col gap-1">
+                    <span className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Ticker</span>
+                    <input
+                      value={inputValue}
+                      onChange={(e) => setInputValue(e.target.value.toUpperCase())}
+                      placeholder="AAPL"
+                      maxLength={10}
+                      className="w-28 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-mono font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-slate-400"
+                    />
+                  </label>
                 </form>
-                <Link
-                  href="/"
-                  className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+                <label className="flex min-w-[170px] flex-col gap-1">
+                  <span className="text-[11px] font-medium uppercase tracking-wide text-slate-500">AI model</span>
+                  <select
+                    value={llmChoice}
+                    onChange={(e) => setLlmChoice(e.target.value as BuySellModelChoice)}
+                    className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-slate-200"
+                  >
+                    <option value="gemini">Gemini</option>
+                    <option value="llama">Llama 3.1</option>
+                    <option value="mistral">Mistral</option>
+                  </select>
+                </label>
+                <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={includeLlmReview}
+                    onChange={(e) => setIncludeLlmReview(e.target.checked)}
+                    className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-400"
+                  />
+                  Include AI explanation
+                </label>
+                <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={includeRetrieval}
+                    onChange={(e) => setIncludeRetrieval(e.target.checked)}
+                    className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-400"
+                  />
+                  Include RAG retrieval
+                </label>
+                <button
+                  type="button"
+                  onClick={() => void load(inputValue)}
+                  disabled={loading || !inputValue.trim()}
+                  className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:opacity-50"
                 >
-                  Home
-                </Link>
+                  {loading ? BS_PHASES[phaseIdx] : "Search"}
+                </button>
               </div>
             }
           />
@@ -198,6 +246,14 @@ export function BuySellReportView() {
               </Card>
             </div>
           </>
+        )}
+
+        {!loading && !report && !error && !hasSearched && (
+          <Card className="text-center">
+            <p className="text-sm text-slate-600">
+              Enter a ticker symbol and click <span className="font-medium text-slate-800">Search</span> to run Buy/Sell analysis.
+            </p>
+          </Card>
         )}
 
         {error && (
@@ -360,6 +416,32 @@ export function BuySellReportView() {
               </p>
             </Card>
 
+            {report.llm_review && (
+              <Card className="border-violet-200 bg-violet-50/50">
+                <h2 className="text-xl font-semibold text-slate-900">AI explanation</h2>
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                  <Badge label={`Requested model: ${llmChoice}`} variant="neutral" />
+                  <Badge
+                    label={
+                      report.llm_review.model && report.llm_review.model !== "none"
+                        ? `Answered by: ${report.llm_review.model}`
+                        : "Answered by: deterministic fallback"
+                    }
+                    variant={report.llm_review.model && report.llm_review.model !== "none" ? "positive" : "neutral"}
+                  />
+                </div>
+                <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-slate-700">
+                  {report.llm_review.rationale}
+                </p>
+                {report.llm_review.model === "none" && (
+                  <p className="mt-2 text-xs text-amber-700">
+                    LLM provider was unavailable, so a deterministic fallback explanation was shown. Set
+                    `GEMINI_API_KEY` or run Ollama locally for richer model-generated output.
+                  </p>
+                )}
+              </Card>
+            )}
+
             {/* Risk & actions */}
             <Card>
               <h2 className="text-xl font-semibold text-slate-900">Risk assessment</h2>
@@ -381,10 +463,12 @@ export function BuySellReportView() {
             <Card>
               <h2 className="text-xl font-semibold text-slate-900">Citations</h2>
               <p className="mt-1 text-sm text-slate-500">
-                Placeholder sources for Phase 1 — RAG will populate these with retrieved chunks.
+                {includeRetrieval
+                  ? "Includes Layer1 sources and retrieved chunks when available."
+                  : "Showing Layer1 deterministic sources. Turn on 'Include RAG retrieval' to add retrieved evidence chunks."}
               </p>
               <ul className="mt-5 space-y-4">
-                {report.citations.map((c) => (
+                {citationGroups.layer1.map((c) => (
                   <li key={c.id} className="rounded-2xl border border-slate-200 bg-slate-50/50 p-4 text-sm">
                     <p className="font-medium text-slate-900">{c.title}</p>
                     <p className="mt-1 text-xs text-slate-500">
@@ -405,6 +489,48 @@ export function BuySellReportView() {
                   </li>
                 ))}
               </ul>
+            </Card>
+
+            <Card className="border-sky-200 bg-sky-50/50">
+              <h2 className="text-xl font-semibold text-slate-900">RAG evidence used</h2>
+              <p className="mt-1 text-sm text-slate-600">
+                Retrieved document/news chunks that were used in Buy/Sell analysis when retrieval is enabled.
+              </p>
+              {!includeRetrieval && (
+                <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                  Retrieval is currently off. Turn on <span className="font-medium">Include RAG retrieval</span> and run
+                  Search to attach retrieved evidence.
+                </p>
+              )}
+              {includeRetrieval && citationGroups.rag.length === 0 && (
+                <p className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
+                  Retrieval was enabled, but no chunks were returned for this run.
+                </p>
+              )}
+              {citationGroups.rag.length > 0 && (
+                <ul className="mt-4 space-y-3">
+                  {citationGroups.rag.map((c) => (
+                    <li key={c.id} className="rounded-xl border border-sky-100 bg-white/90 p-3 text-sm">
+                      <p className="font-medium text-slate-900">{c.title}</p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {c.source}
+                        {c.date ? ` · ${c.date}` : ""}
+                      </p>
+                      {c.url && (
+                        <a
+                          href={c.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="mt-1 inline-block text-xs font-medium text-teal-700 hover:underline"
+                        >
+                          Source link
+                        </a>
+                      )}
+                      {c.snippet && <p className="mt-2 text-xs leading-relaxed text-slate-600">{c.snippet}</p>}
+                    </li>
+                  ))}
+                </ul>
+              )}
             </Card>
 
             {report.memory && (

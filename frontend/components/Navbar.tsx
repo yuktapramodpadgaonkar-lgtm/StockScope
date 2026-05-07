@@ -10,6 +10,7 @@ const NAV_LINKS: { href: string; label: string }[] = [
   { href: "/", label: "Home" },
   { href: "/market-movers", label: "Market movers" },
   { href: "/fundamentals", label: "Fundamentals" },
+  { href: "/buy-sell", label: "Buy Sell Analysis" },
   { href: "/agentic-research", label: "Agentic research" },
   { href: "/evaluation", label: "Model eval" },
 ];

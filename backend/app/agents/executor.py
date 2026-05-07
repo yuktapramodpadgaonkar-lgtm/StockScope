@@ -80,6 +80,7 @@ def execute_buy_sell_pipeline(
     retrieval_top_k: int,
     retrieval_max_age_days: int | None,
     retrieval_query: str | None = None,
+    preferred_model: str = "gemini",
 ) -> ExecutionResult:
     """
     Run Layer1 → optional RAG → report. Records per-step timing for the agent trace.
@@ -173,6 +174,7 @@ def execute_buy_sell_pipeline(
             bundle=bundle,  # type: ignore[arg-type]
             include_llm_review=include_llm_review,
             retrieved_chunks=retrieved,
+            preferred_model=preferred_model,
         )
 
     rep, st_rep = _run_step("score_and_report", "Build BuySellReport", _report)

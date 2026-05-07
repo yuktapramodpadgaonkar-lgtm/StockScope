@@ -336,6 +336,7 @@ def _build_llm_review_via_service(
     f: DimensionRuleScore,
     t: DimensionRuleScore,
     s: DimensionRuleScore,
+    preferred_model: str,
 ) -> LlmReview:
     """Use LLMService (Gemini → LLaMA → Mistral) to explain the deterministic scores."""
     from services.buy_sell_llm_service import generate_buy_sell_explanation
@@ -354,6 +355,7 @@ def _build_llm_review_via_service(
         technical_score=t.score,
         sentiment_score=s.score,
         signals=signals,
+        preferred_model=preferred_model,
     )
 
     return LlmReview(
@@ -381,6 +383,7 @@ def _build_llm_review(
     *,
     include_llm_review: bool,
     retrieval_chunks: list[dict[str, Any]] | None = None,
+    preferred_model: str = "gemini",
 ) -> LlmReview:
     if not include_llm_review:
         return _llm_review_stub(overall, f, t, s, enabled=False)
@@ -402,7 +405,14 @@ def _build_llm_review(
             # Fall through to LLMService
 
     # Use LLMService (Gemini → LLaMA → Mistral) as primary/fallback
-    return _build_llm_review_via_service(ticker, overall, f, t, s)
+    return _build_llm_review_via_service(
+        ticker,
+        overall,
+        f,
+        t,
+        s,
+        preferred_model=preferred_model,
+    )
 
 
 def build_buy_sell_report_from_layer1(
@@ -411,6 +421,7 @@ def build_buy_sell_report_from_layer1(
     *,
     include_llm_review: bool = False,
     retrieved_chunks: list[dict[str, Any]] | None = None,
+    preferred_model: str = "gemini",
 ) -> BuySellReport:
     weights = ScoreWeights()
     f = score_fundamentals(bundle)
@@ -480,6 +491,7 @@ def build_buy_sell_report_from_layer1(
         s=s,
         include_llm_review=include_llm_review,
         retrieval_chunks=retrieved_chunks,
+        preferred_model=preferred_model,
     )
 
     return BuySellReport(
