@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
@@ -60,16 +60,38 @@ function BulletList({ items, tone }: { items: string[]; tone: "bull" | "bear" })
   );
 }
 
+const BS_PHASES = ["Fetching data…", "Scoring…", "Writing explanation…"];
+const BS_PHASE_DELAYS = [0, 4000, 10000];
+
 export function BuySellReportView() {
   const [ticker, setTicker] = useState("AAPL");
   const [inputValue, setInputValue] = useState("AAPL");
   const [report, setReport] = useState<BuySellReport | null>(null);
   const [loading, setLoading] = useState(true);
+  const [phaseIdx, setPhaseIdx] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  function startPhaseTimers() {
+    timersRef.current.forEach(clearTimeout);
+    timersRef.current = [];
+    BS_PHASE_DELAYS.forEach((delay, idx) => {
+      timersRef.current.push(setTimeout(() => setPhaseIdx(idx), delay));
+    });
+  }
+
+  function clearPhaseTimers() {
+    timersRef.current.forEach(clearTimeout);
+    timersRef.current = [];
+  }
+
+  useEffect(() => () => clearPhaseTimers(), []);
 
   const load = useCallback(async (sym: string) => {
     setLoading(true);
+    setPhaseIdx(0);
     setError(null);
+    startPhaseTimers();
     try {
       const data = await fetchBuySellReport(sym);
       setReport(data);
@@ -77,8 +99,10 @@ export function BuySellReportView() {
       setReport(null);
       setError(e instanceof Error ? e.message : "Failed to load report");
     } finally {
+      clearPhaseTimers();
       setLoading(false);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -129,7 +153,7 @@ export function BuySellReportView() {
                     disabled={loading || !inputValue.trim()}
                     className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:opacity-50"
                   >
-                    {loading ? "Loading…" : "Analyze"}
+                    {loading ? BS_PHASES[phaseIdx] : "Analyze"}
                   </button>
                 </form>
                 <Link
@@ -144,17 +168,36 @@ export function BuySellReportView() {
         </Card>
 
         {loading && !report && (
-          <div className="grid gap-4 lg:grid-cols-3">
-            <Card className="lg:col-span-2">
-              <LoadingSkeleton className="h-40 w-full rounded-2xl" />
-            </Card>
+          <>
             <Card>
-              <LoadingSkeleton className="h-40 w-full rounded-2xl" />
+              <div className="flex items-center gap-3 px-1 py-2">
+                <svg className="h-4 w-4 animate-spin text-slate-500" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                </svg>
+                <span className="text-sm font-medium text-slate-700">{BS_PHASES[phaseIdx]}</span>
+              </div>
+              <div className="mt-3 flex gap-2">
+                {BS_PHASES.map((label, i) => (
+                  <div key={label} className="flex-1">
+                    <div className={`h-1.5 rounded-full transition-colors duration-500 ${i <= phaseIdx ? "bg-slate-800" : "bg-slate-200"}`} />
+                    <p className={`mt-1 text-[10px] ${i <= phaseIdx ? "text-slate-700" : "text-slate-400"}`}>{label}</p>
+                  </div>
+                ))}
+              </div>
             </Card>
-            <Card className="lg:col-span-3">
-              <LoadingSkeleton className="h-32 w-full rounded-2xl" />
-            </Card>
-          </div>
+            <div className="grid gap-4 lg:grid-cols-3">
+              <Card className="lg:col-span-2">
+                <LoadingSkeleton className="h-40 w-full rounded-2xl" />
+              </Card>
+              <Card>
+                <LoadingSkeleton className="h-40 w-full rounded-2xl" />
+              </Card>
+              <Card className="lg:col-span-3">
+                <LoadingSkeleton className="h-32 w-full rounded-2xl" />
+              </Card>
+            </div>
+          </>
         )}
 
         {error && (

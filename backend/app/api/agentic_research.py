@@ -46,7 +46,7 @@ class AgenticResearchRequest(BaseModel):
     )
     access_token: str | None = Field(
         default=None,
-        description="Optional mock bearer token for rubric demos (not production auth).",
+        description="JWT bearer token; when present, verifies the user and scopes memory to email:session_id.",
     )
 
 

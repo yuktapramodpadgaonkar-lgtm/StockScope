@@ -1,5 +1,7 @@
 /** Mirrors backend BuySellReport (schema v1.x; optional `agent_pipeline`, `memory`). */
 
+import { getAccessToken } from "@/lib/auth";
+
 export type Recommendation = "BUY" | "HOLD" | "SELL";
 
 export type CitationItem = {
@@ -129,7 +131,9 @@ export async function fetchBuySellReport(ticker: string): Promise<BuySellReport>
   const url =
     `${getApiBase()}/api/buy-sell/analyze/${encodeURIComponent(sym)}` +
     `?include_llm_review=true&use_agent_pipeline=true`;
-  const res = await fetch(url, { cache: "no-store" });
+  const token = getAccessToken();
+  const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
+  const res = await fetch(url, { cache: "no-store", headers });
   if (!res.ok) {
     const text = await res.text();
     throw new Error(text || `Request failed (${res.status})`);
