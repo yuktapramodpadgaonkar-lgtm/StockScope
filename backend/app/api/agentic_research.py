@@ -353,7 +353,7 @@ def _run_tool(step: PlanStep, *, ticker: str, session_id: str) -> tuple[dict[str
                     published_at=None,
                 )
             ]
-            out = {"tool": "fundamental", "report": rep.model_dump(mode="json")}
+            out = {"tool": "fundamental", "report": rep}
         elif tool == "news_sentiment":
             max_articles = int(args.get("max_articles") or 5)
             ns = build_news_sentiment_report(ticker, None, None, max_articles=max_articles, model_name=None)
