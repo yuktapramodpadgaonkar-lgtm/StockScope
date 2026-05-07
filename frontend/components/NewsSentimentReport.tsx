@@ -47,6 +47,21 @@ export function NewsSentimentReport({ data }: NewsSentimentReportProps) {
           Fallback mode used: live Finnhub feed unavailable, so sample articles were used.
         </p>
       ) : null}
+      {!data.llm_model_used ? (
+        <p className="rounded border border-amber-600/40 bg-amber-900/20 px-3 py-2 text-xs text-amber-300">
+          Keyword fallback active — set <span className="font-mono">HUGGINGFACE_API_TOKEN</span> in{" "}
+          <span className="font-mono">backend/.env</span> to enable FinBERT sentiment classification and
+          LLM theme extraction.
+        </p>
+      ) : (
+        <p className="rounded border border-teal-500/30 bg-teal-950/30 px-3 py-2 text-xs text-teal-200">
+          <span className="font-semibold text-gray-200">AI: </span>
+          Themes extracted by{" "}
+          <span className="font-mono">{data.llm_model_used}</span>
+          {data.llm_provider ? ` (${data.llm_provider})` : ""}
+          {data.llm_fallback_used ? " · fallback used" : ""}
+        </p>
+      )}
       {data.rag_retrieved != null || data.rag_error ? (
         <div
           className={`rounded border px-3 py-2 text-xs ${

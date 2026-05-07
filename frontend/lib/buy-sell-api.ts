@@ -122,3 +122,17 @@ export async function fetchMockBuySellReport(): Promise<BuySellReport> {
   }
   return res.json() as Promise<BuySellReport>;
 }
+
+/** Call the real agentic scoring pipeline for any ticker. */
+export async function fetchBuySellReport(ticker: string): Promise<BuySellReport> {
+  const sym = ticker.trim().toUpperCase();
+  const url =
+    `${getApiBase()}/api/buy-sell/analyze/${encodeURIComponent(sym)}` +
+    `?include_llm_review=true&use_agent_pipeline=true`;
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || `Request failed (${res.status})`);
+  }
+  return res.json() as Promise<BuySellReport>;
+}

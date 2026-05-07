@@ -9,7 +9,7 @@ import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import {
-  fetchMockBuySellReport,
+  fetchBuySellReport,
   type BuySellReport,
   type Recommendation,
 } from "@/lib/buy-sell-api";
@@ -61,15 +61,17 @@ function BulletList({ items, tone }: { items: string[]; tone: "bull" | "bear" })
 }
 
 export function BuySellReportView() {
+  const [ticker, setTicker] = useState("AAPL");
+  const [inputValue, setInputValue] = useState("AAPL");
   const [report, setReport] = useState<BuySellReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (sym: string) => {
     setLoading(true);
     setError(null);
     try {
-      const data = await fetchMockBuySellReport();
+      const data = await fetchBuySellReport(sym);
       setReport(data);
     } catch (e) {
       setReport(null);
@@ -80,8 +82,8 @@ export function BuySellReportView() {
   }, []);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    void load(ticker);
+  }, [load, ticker]);
 
   const bullBear = useMemo(() => {
     if (!report) return { bullish: [] as string[], bearish: [] as string[] };
@@ -104,17 +106,32 @@ export function BuySellReportView() {
         <Card>
           <SectionHeader
             title="Buy / Sell analysis"
-            description="Kavout-style report — deterministic scoring with layered fundamentals, technicals, and sentiment."
+            description="Deterministic scoring (fundamentals · technicals · sentiment) with LLM narrative and agent pipeline."
             actions={
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => void load()}
-                  disabled={loading}
-                  className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:opacity-50"
+              <div className="flex flex-wrap items-center gap-2">
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const sym = inputValue.trim().toUpperCase();
+                    if (sym) setTicker(sym);
+                  }}
+                  className="flex gap-1"
                 >
-                  {loading ? "Loading…" : "Reload"}
-                </button>
+                  <input
+                    value={inputValue}
+                    onChange={(e) => setInputValue(e.target.value.toUpperCase())}
+                    placeholder="AAPL"
+                    maxLength={10}
+                    className="w-24 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-mono font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-slate-400"
+                  />
+                  <button
+                    type="submit"
+                    disabled={loading || !inputValue.trim()}
+                    className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:opacity-50"
+                  >
+                    {loading ? "Loading…" : "Analyze"}
+                  </button>
+                </form>
                 <Link
                   href="/"
                   className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
