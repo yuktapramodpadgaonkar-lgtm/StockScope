@@ -82,6 +82,10 @@ def analyze_ticker(
         default=True,
         description="If true and memory is enabled, persist ticker to session and attach memory block to the report.",
     ),
+    preferred_model: str = Query(
+        default="gemini",
+        description="Preferred LLM model for advisory review (gemini | llama | mistral).",
+    ),
 ) -> BuySellReport:
     """
     Analyze endpoint: Layer1 → optional RAG → deterministic scores → optional LLM review.
@@ -108,6 +112,7 @@ def analyze_ticker(
             horizon=eff_horizon,
             retrieval_query=f"buy sell investment thesis risks catalysts for {ticker.strip().upper()}",
             memory_hint=mem_hint,
+            preferred_model=preferred_model,
         )
     else:
         bundle = get_layer1_for_llm(
@@ -138,6 +143,7 @@ def analyze_ticker(
             bundle=bundle,
             include_llm_review=include_llm_review,
             retrieved_chunks=retrieved,
+            preferred_model=preferred_model,
         )
 
     if use_memory and settings.memory_enabled:

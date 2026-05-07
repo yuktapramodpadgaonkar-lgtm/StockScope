@@ -3,6 +3,7 @@
 import { getAccessToken } from "@/lib/auth";
 
 export type Recommendation = "BUY" | "HOLD" | "SELL";
+export type BuySellModelChoice = "gemini" | "llama" | "mistral";
 
 export type CitationItem = {
   id: string;
@@ -48,6 +49,12 @@ export type AgentPipelineBlock = {
     detail: string | null;
   }[];
   critic: CriticResult;
+};
+
+export type LlmReviewBlock = {
+  enabled: boolean;
+  model: string;
+  rationale: string;
 };
 
 export type BuySellReport = {
@@ -103,10 +110,18 @@ export type BuySellReport = {
     };
   };
   citations: CitationItem[];
+  llm_review?: LlmReviewBlock | null;
   /** Phase 6 — present on `/api/buy-sell/analyze` when `use_agent_pipeline=true` (default). */
   agent_pipeline?: AgentPipelineBlock | null;
   /** Phase 7 — present when `use_memory=true` (default) and memory is enabled on the server. */
   memory?: MemoryBlock | null;
+};
+
+export type BuySellRequestOptions = {
+  includeLlmReview?: boolean;
+  includeRetrieval?: boolean;
+  useAgentPipeline?: boolean;
+  preferredModel?: BuySellModelChoice;
 };
 
 function getApiBase(): string {
@@ -126,11 +141,21 @@ export async function fetchMockBuySellReport(): Promise<BuySellReport> {
 }
 
 /** Call the real agentic scoring pipeline for any ticker. */
-export async function fetchBuySellReport(ticker: string): Promise<BuySellReport> {
+export async function fetchBuySellReport(
+  ticker: string,
+  options: BuySellRequestOptions = {},
+): Promise<BuySellReport> {
   const sym = ticker.trim().toUpperCase();
+  const includeLlmReview = options.includeLlmReview ?? false;
+  const includeRetrieval = options.includeRetrieval ?? false;
+  const useAgentPipeline = options.useAgentPipeline ?? true;
+  const preferredModel = options.preferredModel ?? "gemini";
   const url =
     `${getApiBase()}/api/buy-sell/analyze/${encodeURIComponent(sym)}` +
-    `?include_llm_review=true&use_agent_pipeline=true`;
+    `?include_llm_review=${includeLlmReview}` +
+    `&include_retrieval=${includeRetrieval}` +
+    `&use_agent_pipeline=${useAgentPipeline}` +
+    `&preferred_model=${preferredModel}`;
   const token = getAccessToken();
   const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
   const res = await fetch(url, { cache: "no-store", headers });
