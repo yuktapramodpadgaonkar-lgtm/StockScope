@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query
 
 from app.schemas.market_movers import MarketMoversResponse, MoverType, TimeMode, Universe
 from app.services.market_movers_service import MarketMoversService
@@ -16,4 +16,7 @@ def get_market_movers(
     type: MoverType = Query(default=MoverType.gainers),
     limit: int = Query(default=25, ge=1, le=200),
 ) -> MarketMoversResponse:
-    return service.get_market_movers(universe=universe, mode=mode, mover_type=type, limit=limit)
+    try:
+        return service.get_market_movers(universe=universe, mode=mode, mover_type=type, limit=limit)
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Market data unavailable: {exc}") from exc
