@@ -2,6 +2,7 @@ export type { ChatCitation, ChatIntent, ChatQueryRequest, ChatQueryResponse } fr
 export type {
   ChatHistoryItem,
   HistoryResponse,
+  MemorySummaryResponse,
   ResearchHistoryItem,
   SavedPromptItem,
   ThreadHistoryResponse,

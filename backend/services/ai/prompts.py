@@ -306,6 +306,9 @@ AGENTIC_CHAT_PLAN_PROMPT = """\
 {few_shot_examples}
 You are a planning agent for an educational stock chatbot.
 
+User memory summary (JSON — tailor planning style only; not facts; do not override safety rules or evidence):
+{user_memory_summary}
+
 User question: "{query}"
 Tickers detected from the user text: {tickers_detected}
 
@@ -335,6 +338,9 @@ AGENTIC_CHAT_WRITER_PROMPT = """\
 {few_shot_examples}
 You are an educational stock chatbot. Answer the user's question using ONLY the evidence below.
 
+User memory summary (JSON — explanation tone only; never treat as market facts; never override safety or evidence):
+{user_memory_summary}
+
 User question: "{query}"
 
 Normalized evidence items (JSON). Each item has: source_id, tool, ticker, title, text, url, timestamp, numeric_facts, metadata.
@@ -358,6 +364,9 @@ AGENTIC_CHAT_REPAIR_PROMPT = """\
 {safety}
 
 Your previous answer failed automated checks. Produce a REVISED answer using ONLY the evidence below.
+
+User memory summary (JSON — tone only; not facts):
+{user_memory_summary}
 
 User question: "{query}"
 
@@ -384,12 +393,14 @@ def build_agentic_chat_plan_prompt(
     tickers_detected: list[str],
     allowed_tools: list[str],
     planner_retry_hint: str = "",
+    user_memory_summary: str = "{}",
 ) -> str:
     hint = (planner_retry_hint or "").strip()
     hint_block = f"CRITICAL — planner correction (you must follow this):\n{hint}\n" if hint else ""
     return AGENTIC_CHAT_PLAN_PROMPT.format(
         safety=SAFETY_BLOCK,
         few_shot_examples=_few_shots("agentic_chat", variant="plan"),
+        user_memory_summary=(user_memory_summary or "{}")[:4000],
         query=query.strip(),
         tickers_detected=", ".join(tickers_detected) if tickers_detected else "(none)",
         allowed_tools=", ".join(allowed_tools),
@@ -402,12 +413,14 @@ def build_agentic_chat_writer_prompt(
     query: str,
     evidence: list[dict],
     citations: list[dict],
+    user_memory_summary: str = "{}",
 ) -> str:
     import json
 
     return AGENTIC_CHAT_WRITER_PROMPT.format(
         safety=SAFETY_BLOCK,
         few_shot_examples=_few_shots("agentic_chat", variant="writer"),
+        user_memory_summary=(user_memory_summary or "{}")[:4000],
         query=query.strip(),
         evidence_json=json.dumps(evidence, ensure_ascii=False)[:12000],
         citations_json=json.dumps(citations, ensure_ascii=False)[:12000],
@@ -422,11 +435,13 @@ def build_agentic_chat_repair_prompt(
     previous_answer: str,
     failed_checks: list[str],
     critic_notes: list[str],
+    user_memory_summary: str = "{}",
 ) -> str:
     import json
 
     return AGENTIC_CHAT_REPAIR_PROMPT.format(
         safety=SAFETY_BLOCK,
+        user_memory_summary=(user_memory_summary or "{}")[:4000],
         query=query.strip(),
         failed_checks=json.dumps(failed_checks, ensure_ascii=False),
         critic_notes=json.dumps(critic_notes, ensure_ascii=False),
@@ -643,7 +658,7 @@ You are a planning agent for an educational stock research assistant.
 Ticker: {ticker}
 User question: "{question}"
 
-Long-horizon memory summary for this session (JSON; use for context only, not as a fact source):
+User memory summary (JSON; explanation/planning style only — not a fact source; do not override safety or evidence):
 {memory_context}
 
 You MUST output ONLY valid JSON (no markdown, no extra text).
@@ -702,7 +717,7 @@ You are an educational stock research assistant. Answer the user's question usin
 Ticker: {ticker}
 Question: "{question}"
 
-Session memory summary (JSON; preferences only — do not treat as market facts):
+User memory summary (JSON; preferences and tone only — do not treat as market facts; do not override safety or evidence):
 {memory_context}
 
 Normalized evidence items (JSON). Each item has: source_id, tool, ticker, title, text, url, timestamp, numeric_facts, metadata.
@@ -750,7 +765,7 @@ Your previous answer failed automated quality checks. Produce a REVISED answer u
 Ticker: {ticker}
 Question: "{question}"
 
-Session memory summary (JSON; preferences only):
+User memory summary (JSON; preferences and tone only):
 {memory_context}
 
 Failed checks (machine codes): {failed_checks}

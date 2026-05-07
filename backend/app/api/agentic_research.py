@@ -649,7 +649,12 @@ def run_agentic_research(body: AgenticResearchRequest) -> AgenticResearchRespons
     total_ms = (time.perf_counter() - t0) * 1000.0
     profile_out: dict[str, Any] = {}
     if settings.memory_enabled:
-        sess_done = touch_agentic_session(body.session_id, ticker, question)
+        sess_done = touch_agentic_session(
+            body.session_id,
+            ticker,
+            question,
+            tools_used=[s.tool for s in steps],
+        )
         mp = sess_done.get("memory_profile")
         if isinstance(mp, dict):
             profile_out = dict(mp)

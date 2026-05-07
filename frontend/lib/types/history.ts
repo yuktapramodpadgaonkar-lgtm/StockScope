@@ -39,3 +39,12 @@ export type ThreadHistoryResponse = {
   thread_id: string;
   messages: ThreadMessage[];
 };
+
+/** Session long-horizon memory (style hints; not investment advice). */
+export type MemorySummaryResponse = {
+  session_id: string;
+  frequent_tickers: string[];
+  preferred_topics: string[];
+  risk_style: string | null;
+  last_updated: string;
+};

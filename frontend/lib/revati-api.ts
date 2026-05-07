@@ -3,6 +3,7 @@ import type {
   ChatQueryRequest,
   ChatQueryResponse,
   HistoryResponse,
+  MemorySummaryResponse,
   NewsSentimentResponse,
   ThreadHistoryResponse,
 } from "@/lib/revati-types";
@@ -99,4 +100,16 @@ export async function fetchThreadHistory(threadId: string): Promise<ThreadHistor
     throw new Error(await readErrorMessage(res));
   }
   return res.json() as Promise<ThreadHistoryResponse>;
+}
+
+export async function fetchMemorySummary(sessionId: string = "default"): Promise<MemorySummaryResponse> {
+  const sid = sessionId.trim() || "default";
+  const res = await fetch(
+    `${getApiBase()}/api/history/memory-summary?session_id=${encodeURIComponent(sid)}`,
+    { cache: "no-store" },
+  );
+  if (!res.ok) {
+    throw new Error(await readErrorMessage(res));
+  }
+  return res.json() as Promise<MemorySummaryResponse>;
 }

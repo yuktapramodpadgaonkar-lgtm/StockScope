@@ -49,60 +49,289 @@ def _write_all(data: dict[str, Any]) -> None:
     tmp.replace(_STORE_PATH)
 
 
-def _default_memory_profile() -> dict[str, Any]:
-    """Long-horizon summary JSON — derived from session activity, surfaced to agentic RAG."""
+_MEMORY_TOPIC_ALLOWLIST = frozenset(
+    {"fundamentals", "news", "buy_sell", "sentiment", "market_movers"},
+)
+_MEMORY_MAX_FREQUENT_TICKERS = 20
+
+_CAUTIOUS_RISK_RE = re.compile(
+    r"\b(cautious|conservative|risk-averse|risk averse|downside|drawdown|volatil|"
+    r"worried|scared|safe(?:ty)?|capital preservation|don't lose|do not lose|"
+    r"protect (?:my )?(?:money|capital)|low risk)\b",
+    re.IGNORECASE,
+)
+
+
+def _utc_now_iso_ms() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _default_memory_summary() -> dict[str, Any]:
     return {
         "frequent_tickers": [],
-        "preferred_topics": ["fundamentals", "news"],
-        "risk_style": "balanced",
+        "preferred_topics": [],
+        "risk_style": None,
+        "last_updated": _utc_now_iso_ms(),
     }
 
 
-def _analysis_style_to_risk_style(style: str) -> str:
-    s = (style or "balanced").strip().lower()
-    if s == "growth":
-        return "moderate"
-    if s in ("income", "value"):
-        return "cautious"
-    return "balanced"
+def _default_memory_profile() -> dict[str, Any]:
+    """Backward-compatible shape; kept in sync from memory_summary."""
+    return {
+        "frequent_tickers": [],
+        "preferred_topics": [],
+        "risk_style": None,
+    }
 
 
-def recompute_memory_profile(sess: dict[str, Any]) -> dict[str, Any]:
-    """Refresh memory_profile from recent_tickers, session_summary, and analysis_style."""
-    mp = dict(sess.get("memory_profile") or _default_memory_profile())
-    recent = [str(x).upper() for x in (sess.get("recent_tickers") or []) if x]
-    mp["frequent_tickers"] = recent[:10]
+def _coerce_topics(topics: list[Any]) -> list[str]:
+    out: list[str] = []
+    legacy = {
+        "fundamental": "fundamentals",
+        "technicals": "fundamentals",
+        "comparison": "fundamentals",
+    }
+    for t in topics:
+        s = str(t).strip().lower()
+        s = legacy.get(s, s)
+        if s in _MEMORY_TOPIC_ALLOWLIST and s not in out:
+            out.append(s)
+    return sorted(out)
 
-    topics: set[str] = set(mp.get("preferred_topics") or []) if isinstance(mp.get("preferred_topics"), list) else set()
-    summ = (sess.get("session_summary") or "").lower()
-    for key, label in (
-        ("news", "news"),
-        ("sentiment", "news"),
-        ("headline", "news"),
-        ("fundamental", "fundamentals"),
-        ("valuation", "fundamentals"),
-        ("earnings", "fundamentals"),
-        ("technical", "technicals"),
-        ("chart", "technicals"),
+
+def _ensure_memory_summary(sess: dict[str, Any]) -> dict[str, Any]:
+    ms = sess.get("memory_summary")
+    if not isinstance(ms, dict):
+        ms = _default_memory_summary()
+        sess["memory_summary"] = ms
+    ms.setdefault("frequent_tickers", [])
+    ms.setdefault("preferred_topics", [])
+    if "risk_style" not in ms:
+        ms["risk_style"] = None
+    ms.setdefault("last_updated", _utc_now_iso_ms())
+    if not isinstance(ms.get("frequent_tickers"), list):
+        ms["frequent_tickers"] = []
+    if not isinstance(ms.get("preferred_topics"), list):
+        ms["preferred_topics"] = []
+    return ms
+
+
+def _migrate_profile_to_summary_if_needed(sess: dict[str, Any]) -> None:
+    """One-time: copy legacy memory_profile into memory_summary when summary is empty."""
+    ms = _ensure_memory_summary(sess)
+    if (ms.get("frequent_tickers") or ms.get("preferred_topics")) and ms.get("last_updated"):
+        return
+    mp = sess.get("memory_profile")
+    if not isinstance(mp, dict):
+        return
+    ft = mp.get("frequent_tickers")
+    if isinstance(ft, list) and ft:
+        ms["frequent_tickers"] = _coerce_tickers_list([str(x).upper() for x in ft if x])
+    pt = mp.get("preferred_topics")
+    if isinstance(pt, list) and pt:
+        ms["preferred_topics"] = _coerce_topics(pt)
+    rs = mp.get("risk_style")
+    if rs in ("cautious", "moderate", "balanced") or rs is None:
+        ms["risk_style"] = "cautious" if rs in ("cautious", "moderate") else None
+    ms["last_updated"] = _utc_now_iso_ms()
+
+
+def _coerce_tickers_list(symbols: list[str]) -> list[str]:
+    seen: set[str] = set()
+    out: list[str] = []
+    for s in symbols:
+        u = str(s).strip().upper()
+        if u and u not in seen:
+            seen.add(u)
+            out.append(u)
+    return out[:_MEMORY_MAX_FREQUENT_TICKERS]
+
+
+def _prepend_tickers_memory_summary(sess: dict[str, Any], symbols: list[str]) -> None:
+    if not symbols:
+        return
+    ms = _ensure_memory_summary(sess)
+    cur = [str(x).upper() for x in ms.get("frequent_tickers") or [] if x]
+    for s in reversed(_coerce_tickers_list(symbols)):
+        if s in cur:
+            cur.remove(s)
+        cur.insert(0, s)
+    ms["frequent_tickers"] = cur[:_MEMORY_MAX_FREQUENT_TICKERS]
+    ms["last_updated"] = _utc_now_iso_ms()
+
+
+def infer_preferred_topics(
+    user_text: str,
+    *,
+    tools_used: list[str] | None = None,
+    intent: str | None = None,
+    session_summary_snippet: str | None = None,
+) -> list[str]:
+    """Map activity to rubric topic labels (subset of allowlist)."""
+    parts = [user_text or "", session_summary_snippet or ""]
+    blob = " ".join(parts).lower()
+
+    found: set[str] = set()
+
+    if tools_used:
+        for t in tools_used:
+            tt = str(t).strip().lower()
+            if tt == "fundamental":
+                found.add("fundamentals")
+            elif tt == "news_sentiment":
+                if any(x in blob for x in ("sentiment", "bullish", "bearish", "tone", "mood", "feeling")):
+                    found.add("sentiment")
+                found.add("news")
+            elif tt == "buy_sell":
+                found.add("buy_sell")
+            elif tt == "history":
+                pass
+
+    if intent == "sentiment_question":
+        found.add("sentiment")
+    if intent == "comparison_question":
+        found.add("fundamentals")
+    if intent == "stock_explanation":
+        found.add("news")
+
+    if any(x in blob for x in ("market mover", "movers", "gainers", "losers", "most active", "biggest", "heatmap")):
+        found.add("market_movers")
+    if any(
+        x in blob
+        for x in (
+            "sentiment",
+            "bullish",
+            "bearish",
+            "fear",
+            "greed",
+            "mood",
+            "tone of news",
+        )
     ):
-        if key in summ:
-            topics.add(label)
-    if not topics:
-        topics = {"fundamentals", "news"}
-    mp["preferred_topics"] = sorted(topics)
+        found.add("sentiment")
+    if any(
+        x in blob
+        for x in (
+            "fundamental",
+            "p/e",
+            "pe ratio",
+            "valuation",
+            "earnings",
+            "revenue",
+            "margin",
+            "balance sheet",
+            "cash flow",
+            "dividend yield",
+        )
+    ):
+        found.add("fundamentals")
+    if any(x in blob for x in ("news", "headline", "article", "story", "reported", "breaking")):
+        found.add("news")
+    if any(
+        x in blob
+        for x in (
+            "should i buy",
+            "should i sell",
+            "buy or sell",
+            "bull case",
+            "bear case",
+            "thesis",
+            "price target",
+        )
+    ):
+        found.add("buy_sell")
 
-    mp["risk_style"] = _analysis_style_to_risk_style(str(sess.get("analysis_style") or "balanced"))
+    return sorted(found & _MEMORY_TOPIC_ALLOWLIST)
+
+
+def user_text_suggests_cautious_risk(user_text: str) -> bool:
+    return bool(_CAUTIOUS_RISK_RE.search(user_text or ""))
+
+
+def _analysis_style_implies_cautious(sess: dict[str, Any]) -> bool:
+    s = str(sess.get("analysis_style") or "balanced").strip().lower()
+    return s in ("income", "value")
+
+
+def _sync_memory_profile_from_summary(sess: dict[str, Any]) -> dict[str, Any]:
+    ms = _ensure_memory_summary(sess)
+    mp = {
+        "frequent_tickers": list(ms.get("frequent_tickers") or []),
+        "preferred_topics": list(ms.get("preferred_topics") or []),
+        "risk_style": ms.get("risk_style"),
+    }
     sess["memory_profile"] = mp
     return mp
 
 
-def memory_profile_for_prompt(sess: dict[str, Any]) -> str:
-    """Compact JSON string for planner/writer context."""
-    mp = sess.get("memory_profile") or recompute_memory_profile(sess)
+def recompute_memory_profile(sess: dict[str, Any]) -> dict[str, Any]:
+    """Refresh memory_profile from memory_summary and session prefs (backward compat)."""
+    _migrate_profile_to_summary_if_needed(sess)
+    ms = _ensure_memory_summary(sess)
+    if _analysis_style_implies_cautious(sess):
+        ms["risk_style"] = "cautious"
+        ms["last_updated"] = _utc_now_iso_ms()
+    summ_topics = infer_preferred_topics(
+        "",
+        session_summary_snippet=(sess.get("session_summary") or "")[:2000],
+    )
+    if summ_topics:
+        merged = _coerce_topics(list(ms.get("preferred_topics") or []) + summ_topics)
+        ms["preferred_topics"] = merged
+        ms["last_updated"] = _utc_now_iso_ms()
+    return _sync_memory_profile_from_summary(sess)
+
+
+def memory_summary_dict(sess: dict[str, Any]) -> dict[str, Any]:
+    """Public memory_summary shape for APIs."""
+    _migrate_profile_to_summary_if_needed(sess)
+    ms = _ensure_memory_summary(sess)
+    return {
+        "frequent_tickers": [str(x).upper() for x in ms.get("frequent_tickers") or [] if x],
+        "preferred_topics": list(ms.get("preferred_topics") or []),
+        "risk_style": ms.get("risk_style"),
+        "last_updated": str(ms.get("last_updated") or _utc_now_iso_ms()),
+    }
+
+
+def memory_summary_for_prompt(sess: dict[str, Any]) -> str:
+    """JSON for planner/writer: preferences only, not a fact source."""
     try:
-        return json.dumps(mp, ensure_ascii=True)
+        return json.dumps(memory_summary_dict(sess), ensure_ascii=True)
     except (TypeError, ValueError):
         return "{}"
+
+
+def memory_profile_for_prompt(sess: dict[str, Any]) -> str:
+    """Alias: prompts use long-horizon user memory summary JSON."""
+    return memory_summary_for_prompt(sess)
+
+
+def merge_memory_after_interaction(
+    sess: dict[str, Any],
+    *,
+    user_text: str,
+    tickers: list[str],
+    tools_used: list[str] | None = None,
+    intent: str | None = None,
+) -> dict[str, Any]:
+    """Update memory_summary from one completed turn (chat or agentic)."""
+    ms = _ensure_memory_summary(sess)
+    _prepend_tickers_memory_summary(sess, tickers)
+    new_topics = infer_preferred_topics(
+        user_text,
+        tools_used=tools_used,
+        intent=intent,
+        session_summary_snippet=(sess.get("session_summary") or "")[:1500],
+    )
+    if new_topics:
+        ms["preferred_topics"] = _coerce_topics(list(ms.get("preferred_topics") or []) + new_topics)
+    if user_text_suggests_cautious_risk(user_text):
+        ms["risk_style"] = "cautious"
+    if _analysis_style_implies_cautious(sess):
+        ms["risk_style"] = "cautious"
+    ms["last_updated"] = _utc_now_iso_ms()
+    return _sync_memory_profile_from_summary(sess)
 
 
 def apply_eval_memory_seed(session_id: str, seed: dict[str, Any]) -> dict[str, Any]:
@@ -115,16 +344,39 @@ def apply_eval_memory_seed(session_id: str, seed: dict[str, Any]) -> dict[str, A
     if freq := seed.get("frequent_tickers"):
         if isinstance(freq, list):
             sess["recent_tickers"] = [str(x).upper() for x in freq if x][:30]
-    if isinstance(seed.get("memory_profile"), dict):
-        base = dict(sess.get("memory_profile") or _default_memory_profile())
-        base.update(seed["memory_profile"])
-        sess["memory_profile"] = base
     if seed.get("session_summary") is not None:
         sess["session_summary"] = str(seed["session_summary"])[:4000]
     if seed.get("analysis_style") is not None:
         s = str(seed["analysis_style"]).strip().lower()
         if s in ("balanced", "growth", "income", "value"):
             sess["analysis_style"] = s
+
+    ms = _ensure_memory_summary(sess)
+    if freq and isinstance(freq, list):
+        ms["frequent_tickers"] = _coerce_tickers_list([str(x).upper() for x in freq if x])
+    if isinstance(seed.get("memory_summary"), dict):
+        sm = seed["memory_summary"]
+        if isinstance(sm.get("frequent_tickers"), list):
+            ms["frequent_tickers"] = _coerce_tickers_list(
+                [str(x).upper() for x in sm["frequent_tickers"] if x]
+            )
+        if isinstance(sm.get("preferred_topics"), list):
+            ms["preferred_topics"] = _coerce_topics(sm["preferred_topics"])
+        if sm.get("risk_style") is not None:
+            ms["risk_style"] = sm["risk_style"]
+    if isinstance(seed.get("memory_profile"), dict):
+        mp_seed = seed["memory_profile"]
+        if isinstance(mp_seed.get("frequent_tickers"), list):
+            ms["frequent_tickers"] = _coerce_tickers_list(
+                [str(x).upper() for x in mp_seed["frequent_tickers"] if x]
+            )
+        if isinstance(mp_seed.get("preferred_topics"), list):
+            ms["preferred_topics"] = _coerce_topics(mp_seed["preferred_topics"])
+        if mp_seed.get("risk_style") is not None:
+            ms["risk_style"] = mp_seed["risk_style"]
+    ms["last_updated"] = _utc_now_iso_ms()
+    _sync_memory_profile_from_summary(sess)
+
     recompute_memory_profile(sess)
     if isinstance(seed.get("memory_profile"), dict):
         mp = dict(sess["memory_profile"])
@@ -132,21 +384,72 @@ def apply_eval_memory_seed(session_id: str, seed: dict[str, Any]) -> dict[str, A
             if v is not None:
                 mp[k] = v
         sess["memory_profile"] = mp
+        _ensure_memory_summary(sess)
+        if isinstance(mp.get("frequent_tickers"), list):
+            ms["frequent_tickers"] = _coerce_tickers_list(
+                [str(x).upper() for x in mp["frequent_tickers"] if x]
+            )
+        if isinstance(mp.get("preferred_topics"), list):
+            ms["preferred_topics"] = _coerce_topics(mp["preferred_topics"])
+        if mp.get("risk_style") is not None:
+            ms["risk_style"] = mp.get("risk_style")
+        ms["last_updated"] = _utc_now_iso_ms()
+        _sync_memory_profile_from_summary(sess)
+
     sess["updated_at"] = datetime.now(timezone.utc).isoformat()
     data["sessions"][sid] = sess
     _write_all(data)
     return sess
 
 
-def touch_agentic_session(session_id: str, ticker: str, question: str) -> dict[str, Any]:
-    """After an agentic run: bump recent tickers and topic hints from the question."""
+def touch_chat_session(
+    session_id: str,
+    *,
+    user_query: str,
+    tickers: list[str],
+    tools_used: list[str] | None,
+    intent: str | None,
+) -> dict[str, Any]:
+    """After a chatbot turn: merge tickers/topics/risk hints into memory_summary."""
+    if not settings.memory_enabled:
+        return _default_session_payload(_sanitize_session_id(session_id))
+    sid = _sanitize_session_id(session_id)
+    data = _read_all()
+    sess = data["sessions"].get(sid) or _default_session_payload(sid)
+    merge_memory_after_interaction(
+        sess,
+        user_text=user_query or "",
+        tickers=tickers,
+        tools_used=tools_used,
+        intent=intent,
+    )
+    recompute_memory_profile(sess)
+    sess["updated_at"] = datetime.now(timezone.utc).isoformat()
+    data["sessions"][sid] = sess
+    _write_all(data)
+    return sess
+
+
+def touch_agentic_session(
+    session_id: str,
+    ticker: str,
+    question: str,
+    tools_used: list[str] | None = None,
+) -> dict[str, Any]:
+    """After an agentic run: bump recent tickers and merge question/tools into memory_summary."""
     if not settings.memory_enabled:
         return _default_session_payload(_sanitize_session_id(session_id))
     record_ticker_analysis(session_id, ticker)
     sid = _sanitize_session_id(session_id)
     data = _read_all()
     sess = data["sessions"].get(sid) or _default_session_payload(sid)
-    merge_topics_from_question(sess, question)
+    merge_memory_after_interaction(
+        sess,
+        user_text=question or "",
+        tickers=[ticker.strip().upper()] if ticker else [],
+        tools_used=tools_used,
+        intent=None,
+    )
     recompute_memory_profile(sess)
     sess["updated_at"] = datetime.now(timezone.utc).isoformat()
     data["sessions"][sid] = sess
@@ -155,31 +458,26 @@ def touch_agentic_session(session_id: str, ticker: str, question: str) -> dict[s
 
 
 def merge_topics_from_question(sess: dict[str, Any], question: str) -> None:
-    q = (question or "").lower()
-    mp = dict(sess.get("memory_profile") or _default_memory_profile())
-    topics = set(mp.get("preferred_topics") or []) if isinstance(mp.get("preferred_topics"), list) else set()
-    if not topics:
-        topics = {"fundamentals", "news"}
-    if any(x in q for x in ("news", "headline", "sentiment", "article")):
-        topics.add("news")
-    if any(x in q for x in ("fundamental", "pe ratio", "valuation", "earnings", "margin")):
-        topics.add("fundamentals")
-    if any(x in q for x in ("technical", "chart", "momentum", "moving average")):
-        topics.add("technicals")
-    if any(x in q for x in ("compare", "versus", " vs ")):
-        topics.add("comparison")
-    mp["preferred_topics"] = sorted(topics)
-    sess["memory_profile"] = mp
+    """Backward-compatible: merge topic hints from a natural-language question."""
+    merge_memory_after_interaction(
+        sess,
+        user_text=question or "",
+        tickers=[],
+        tools_used=None,
+        intent=None,
+    )
 
 
 def _default_session_payload(session_id: str) -> dict[str, Any]:
     now = datetime.now(timezone.utc).isoformat()
+    summary = _default_memory_summary()
     return {
         "session_id": session_id,
         "recent_tickers": [],
         "preferred_horizon": None,
         "analysis_style": "balanced",
         "session_summary": "",
+        "memory_summary": summary,
         "memory_profile": _default_memory_profile(),
         "updated_at": now,
     }
@@ -200,12 +498,17 @@ def load_session(session_id: str) -> dict[str, Any]:
     sess.setdefault("session_summary", "")
     sess.setdefault("preferred_horizon", None)
     sess.setdefault("updated_at", datetime.now(timezone.utc).isoformat())
+    needs_memory_summary_persist = "memory_summary" not in sess
+    sess.setdefault("memory_summary", _default_memory_summary())
+    _migrate_profile_to_summary_if_needed(sess)
     migrated = False
     if "memory_profile" not in sess or not isinstance(sess.get("memory_profile"), dict):
         sess["memory_profile"] = _default_memory_profile()
         recompute_memory_profile(sess)
         migrated = True
-    if migrated:
+    else:
+        _sync_memory_profile_from_summary(sess)
+    if migrated or needs_memory_summary_persist:
         data["sessions"][sid] = sess
         _write_all(data)
     return sess
@@ -254,6 +557,8 @@ def record_ticker_analysis(session_id: str, ticker: str) -> dict[str, Any]:
     sess["recent_tickers"] = recent[:cap]
     if not (str(sess.get("session_summary") or "").strip()):
         sess["session_summary"] = _auto_summary(sess["recent_tickers"], "")
+    _ensure_memory_summary(sess)
+    _prepend_tickers_memory_summary(sess, [sym])
     sess.setdefault("memory_profile", _default_memory_profile())
     recompute_memory_profile(sess)
     sess["updated_at"] = datetime.now(timezone.utc).isoformat()

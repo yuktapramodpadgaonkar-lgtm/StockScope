@@ -16,6 +16,8 @@ import re
 import uuid
 from datetime import datetime, timezone
 
+from app.core.config import settings
+from app.memory import load_session, memory_profile_for_prompt, touch_chat_session
 from app.schemas.chat import ChatCitation, ChatIntent, ChatQueryResponse
 from app.agentic.unified_evidence import build_normalized_evidence
 from app.observability.jsonl_audit import log_model_call, log_tool_call
@@ -296,7 +298,19 @@ def handle_chat_query(
             tid, text, response.answer,
             intent="financial_advice_rejected",
         )
+        if settings.memory_enabled:
+            touch_chat_session(
+                tid,
+                user_query=text,
+                tickers=tickers,
+                tools_used=None,
+                intent="financial_advice_rejected",
+            )
         return response
+
+    mem_ctx = "{}"
+    if settings.memory_enabled:
+        mem_ctx = memory_profile_for_prompt(load_session(tid))
 
     # Step 2: Agentic planner
     allowed: list[str] = ["fundamental", "news_sentiment"]
@@ -316,6 +330,7 @@ def handle_chat_query(
             tickers_detected=tickers,
             allowed_tools=allowed,
             planner_retry_hint=planner_hint,
+            user_memory_summary=mem_ctx,
         )
         plan_result = _llm.generate_response(plan_prompt, preferred_model=model_name or "gemini")
         log_model_call(
@@ -403,7 +418,12 @@ def handle_chat_query(
     citations_json = [c.model_dump(mode="json") for c in citations]
 
     # Step 4: Writer + critic (+ optional repair)
-    writer_prompt = build_agentic_chat_writer_prompt(query=text, evidence=normalized, citations=citations_json)
+    writer_prompt = build_agentic_chat_writer_prompt(
+        query=text,
+        evidence=normalized,
+        citations=citations_json,
+        user_memory_summary=mem_ctx,
+    )
     write_res = _llm.generate_response(writer_prompt, preferred_model=model_name or "gemini")
     log_model_call(
         provider=write_res.provider or "none",
@@ -442,6 +462,7 @@ def handle_chat_query(
             previous_answer=answer,
             failed_checks=failed,
             critic_notes=notes,
+            user_memory_summary=mem_ctx,
         )
         rep = _llm.generate_response(repair_prompt, preferred_model=model_name or "gemini")
         log_model_call(
@@ -504,4 +525,18 @@ def handle_chat_query(
         provider=response.llm_provider,
         fallback_used=response.llm_fallback_used if response.llm_fallback_used else None,
     )
+    if settings.memory_enabled:
+        tools_used = [str(st.get("tool") or "") for st in steps if st.get("tool")]
+        seen: dict[str, None] = {}
+        for t in tickers + list(_tickers_in_answer(answer)):
+            u = str(t).upper()
+            if u not in _STOPWORDS and u not in seen:
+                seen[u] = None
+        touch_chat_session(
+            tid,
+            user_query=text,
+            tickers=list(seen.keys())[:16],
+            tools_used=tools_used or None,
+            intent=intent,
+        )
     return response

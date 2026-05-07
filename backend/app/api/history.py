@@ -2,11 +2,13 @@ from __future__ import annotations
 
 """User history API with lightweight per-user JSON persistence."""
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from app.memory import load_session, memory_summary_dict
 from app.schemas.history import (
     HistoryResponse,
+    MemorySummaryResponse,
     SavePromptRequest,
     SavePromptResponse,
     ThreadHistoryResponse,
@@ -34,6 +36,19 @@ def _optional_email(creds: HTTPAuthorizationCredentials | None = Depends(_bearer
 def get_history(email: str | None = Depends(_optional_email)) -> HistoryResponse:
     """Return chat, research and saved prompt history for the authenticated user."""
     return get_history_payload(email)
+
+
+@router.get("/memory-summary", response_model=MemorySummaryResponse)
+def get_memory_summary(
+    session_id: str = Query("default", min_length=1, max_length=64),
+    email: str | None = Depends(_optional_email),
+) -> MemorySummaryResponse:
+    """Session-scoped memory summary (tickers/topics/risk tone) for UI and debugging."""
+    _ = email
+    sid = (session_id or "default").strip() or "default"
+    sess = load_session(sid)
+    body = memory_summary_dict(sess)
+    return MemorySummaryResponse(session_id=str(sess.get("session_id") or sid), **body)
 
 
 @router.get("/thread/{thread_id}", response_model=ThreadHistoryResponse)
