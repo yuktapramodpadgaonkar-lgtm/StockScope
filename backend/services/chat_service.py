@@ -275,6 +275,7 @@ def handle_chat_query(
     query: str,
     thread_id: str | None,
     model_name: str | None = None,
+    email: str | None = None,
 ) -> ChatQueryResponse:
     """
     Produce a structured chat response for the given user query.
@@ -287,6 +288,7 @@ def handle_chat_query(
         raise ValueError("query is required")
 
     tid = (thread_id or "").strip() or f"thread_{uuid.uuid4().hex[:12]}"
+    _mem_key = f"{email}:{tid}" if email else tid
     ts = _utc_now_iso()
     tickers = _extract_tickers(text)
     intent = _detect_intent(text)
@@ -300,7 +302,7 @@ def handle_chat_query(
         )
         if settings.memory_enabled:
             touch_chat_session(
-                tid,
+                _mem_key,
                 user_query=text,
                 tickers=tickers,
                 tools_used=None,
@@ -310,7 +312,7 @@ def handle_chat_query(
 
     mem_ctx = "{}"
     if settings.memory_enabled:
-        mem_ctx = memory_profile_for_prompt(load_session(tid))
+        mem_ctx = memory_profile_for_prompt(load_session(_mem_key))
 
     # Step 2: Agentic planner
     allowed: list[str] = ["fundamental", "news_sentiment"]
@@ -533,7 +535,7 @@ def handle_chat_query(
             if u not in _STOPWORDS and u not in seen:
                 seen[u] = None
         touch_chat_session(
-            tid,
+            _mem_key,
             user_query=text,
             tickers=list(seen.keys())[:16],
             tools_used=tools_used or None,

@@ -432,14 +432,18 @@ def run_agentic_research(body: AgenticResearchRequest) -> AgenticResearchRespons
     t0 = time.perf_counter()
     ticker = body.ticker.strip().upper()
     question = body.question.strip()
+
+    # Scope memory to the authenticated user when a valid JWT is present.
+    _email: str | None = None
+    if body.access_token:
+        _email = verify_access_token(body.access_token)
+        if _email is None:
+            raise HTTPException(status_code=401, detail="Invalid or expired token")
+    _mem_key = f"{_email}:{body.session_id}" if _email else body.session_id
+
     mem_ctx = "{}"
     if settings.memory_enabled:
-        mem_ctx = memory_profile_for_prompt(load_session(body.session_id))
-
-    # optional access token for demos: validate format only
-    if body.access_token:
-        if verify_access_token(body.access_token) is None:
-            raise HTTPException(status_code=401, detail="Invalid or expired token")
+        mem_ctx = memory_profile_for_prompt(load_session(_mem_key))
 
     allowed = _tool_allowlist(body)
     allowed_sorted = sorted(allowed)
@@ -650,7 +654,7 @@ def run_agentic_research(body: AgenticResearchRequest) -> AgenticResearchRespons
     profile_out: dict[str, Any] = {}
     if settings.memory_enabled:
         sess_done = touch_agentic_session(
-            body.session_id,
+            _mem_key,
             ticker,
             question,
             tools_used=[s.tool for s in steps],

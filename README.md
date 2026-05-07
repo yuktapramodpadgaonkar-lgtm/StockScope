@@ -299,6 +299,7 @@ Frontend (Next.js + TypeScript + Tailwind)
 | `/history` | Research and chat history (with model metadata) |
 | `/agentic-research` | Agentic RAG research pipeline |
 | `/evaluation` | Multi-model comparison (Gemini / LLaMA / Mistral) |
+| `/signup` | Create account / register |
 | `/login` | Authentication |
 
 > **Note:** Authentication uses real JWT (HS256 via python-jose), a SQLite user store (`backend/data/users.db`), and bcrypt password hashing. Tokens expire after 24 hours. Use `POST /api/auth/register` to create an account and `POST /api/auth/login` to get a signed token.
