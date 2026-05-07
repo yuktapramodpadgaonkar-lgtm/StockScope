@@ -299,6 +299,7 @@ Frontend (Next.js + TypeScript + Tailwind)
 | `/history` | Research and chat history (with model metadata) |
 | `/agentic-research` | Agentic RAG research pipeline |
 | `/evaluation` | Multi-model comparison (Gemini / LLaMA / Mistral) |
+| `/news-sentiment` | News sentiment analysis (FinBERT + LLM themes) |
 | `/signup` | Create account / register |
 | `/login` | Authentication |
 

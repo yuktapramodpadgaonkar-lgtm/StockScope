@@ -7,7 +7,7 @@ import { type FormEvent, useState } from "react";
 import { login } from "@/lib/auth";
 
 type LoginCardProps = {
-  /** Override mock login (e.g. tests or future API-backed login). */
+  /** Called on successful login to update auth state. */
   onLogin?: (email: string, password: string) => void | Promise<void>;
 };
 

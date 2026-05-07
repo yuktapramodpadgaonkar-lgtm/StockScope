@@ -18,10 +18,6 @@ function SentimentBar({ label, value, color }: { label: string; value: number; c
   );
 }
 
-/**
- * Presents a news-sentiment API payload (mock or live).
- * TODO: Swap static bars for charts when analytics layer lands.
- */
 export function NewsSentimentReport({ data }: NewsSentimentReportProps) {
   const { aggregate_sentiment: agg } = data;
 
