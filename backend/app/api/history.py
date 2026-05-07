@@ -32,7 +32,6 @@ def _optional_email(creds: HTTPAuthorizationCredentials | None = Depends(_bearer
 
 
 @router.get("", response_model=HistoryResponse)
-@router.get("/", response_model=HistoryResponse)
 def get_history(email: str | None = Depends(_optional_email)) -> HistoryResponse:
     """Return chat, research and saved prompt history for the authenticated user."""
     return get_history_payload(email)

@@ -5,7 +5,8 @@ import re
 import time
 from typing import Any, Literal
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 
 from app.observability.jsonl_audit import log_model_call, log_tool_call
@@ -27,6 +28,14 @@ from services.history_service import get_history
 
 router = APIRouter(prefix="/api/agentic-research", tags=["Agentic RAG"])
 _llm = LLMService()
+_bearer = HTTPBearer(auto_error=False)
+
+
+def _optional_email(creds: HTTPAuthorizationCredentials | None = Depends(_bearer)) -> str | None:
+    """Extract email from bearer token if present; return None without raising."""
+    if creds and creds.credentials:
+        return verify_access_token(creds.credentials)
+    return None
 
 
 class AgenticResearchRequest(BaseModel):
@@ -43,10 +52,6 @@ class AgenticResearchRequest(BaseModel):
         default=None,
         description="Optional second symbol; fundamentals + news evidence are merged for compare-style questions.",
         max_length=16,
-    )
-    access_token: str | None = Field(
-        default=None,
-        description="JWT bearer token; when present, verifies the user and scopes memory to email:session_id.",
     )
 
 
@@ -428,17 +433,14 @@ def _run_tool(step: PlanStep, *, ticker: str, session_id: str) -> tuple[dict[str
 
 
 @router.post("/run", response_model=AgenticResearchResponse)
-def run_agentic_research(body: AgenticResearchRequest) -> AgenticResearchResponse:
+def run_agentic_research(
+    body: AgenticResearchRequest,
+    _email: str | None = Depends(_optional_email),
+) -> AgenticResearchResponse:
     t0 = time.perf_counter()
     ticker = body.ticker.strip().upper()
     question = body.question.strip()
 
-    # Scope memory to the authenticated user when a valid JWT is present.
-    _email: str | None = None
-    if body.access_token:
-        _email = verify_access_token(body.access_token)
-        if _email is None:
-            raise HTTPException(status_code=401, detail="Invalid or expired token")
     _mem_key = f"{_email}:{body.session_id}" if _email else body.session_id
 
     mem_ctx = "{}"
