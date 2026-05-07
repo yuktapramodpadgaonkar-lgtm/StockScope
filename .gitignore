@@ -40,3 +40,6 @@ backend/evaluation/results/
 data/eval/
 data/memory/
 backend/data/users.db
+
+# Runtime RAG chunk store (rebuilt on ingest; not source-controlled)
+data/rag/

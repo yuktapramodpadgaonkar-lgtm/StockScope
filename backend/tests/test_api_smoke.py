@@ -164,3 +164,92 @@ def test_news_sentiment_fallback_not_500() -> None:
     body = r.json()
     assert body.get("ticker") == "AAPL"
     assert "aggregate_sentiment" in body
+
+
+# ── Agentic research end-to-end (mocked LLM + tools) ─────────────────────────
+
+def test_agentic_research_end_to_end(monkeypatch: pytest.MonkeyPatch) -> None:
+    """
+    Exercises the full plan → tool-execute → write → critic route without
+    hitting real LLMs or external data sources.
+    """
+    import app.api.agentic_research as ar_module
+    from services.ai.schemas import LLMResponse
+
+    PLAN_JSON = (
+        '{"steps":['
+        '{"tool":"fundamental","args":{"ticker":"AAPL"}},'
+        '{"tool":"news_sentiment","args":{"ticker":"AAPL","max_articles":3}}'
+        "]}"
+    )
+    WRITER_JSON = (
+        '{"answer":"AAPL shows stable performance based on available data.",'
+        '"citations_used":[1]}'
+    )
+
+    _call = [0]
+
+    def _fake_generate(prompt: str, preferred_model: str = "gemini") -> LLMResponse:
+        _call[0] += 1
+        text = PLAN_JSON if _call[0] == 1 else WRITER_JSON
+        return LLMResponse(
+            response=text,
+            model_used="gemini",
+            provider="google",
+            fallback_used=False,
+            error=None,
+        )
+
+    _TOOL_REPORT = {
+        "ticker": "AAPL",
+        "company_name": "Apple Inc.",
+        "verdict": "STRONG",
+        "sector": "Technology",
+        "industry": "Consumer Electronics",
+        "strengths": ["Strong revenue"],
+        "risks": ["Competition"],
+        "metrics": {},
+        "current_price": None,
+        "aggregate_sentiment": {
+            "overall_label": "positive",
+            "positive": 60,
+            "neutral": 30,
+            "negative": 10,
+        },
+        "summary": "Stable outlook with positive sentiment.",
+        "major_themes": ["Growth"],
+        "articles": [],
+        "citations": [],
+        "disclaimer": "Educational only.",
+    }
+
+    def _fake_run_tool(step, *, ticker: str, session_id: str):
+        citation = ar_module.CitationItem(
+            title=f"{ticker} data",
+            url=f"https://finance.yahoo.com/quote/{ticker}",
+            source="yfinance",
+        )
+        return ({"tool": step.tool, "report": _TOOL_REPORT}, [citation], 50.0)
+
+    monkeypatch.setattr(ar_module._llm, "generate_response", _fake_generate)
+    monkeypatch.setattr(ar_module, "_run_tool", _fake_run_tool)
+
+    r = _client().post(
+        "/api/agentic-research/run",
+        json={
+            "ticker": "AAPL",
+            "question": "What is the fundamental outlook?",
+            "session_id": "smoke-e2e",
+            "include_buy_sell": False,
+            "include_news": True,
+            "include_fundamental": True,
+            "preferred_model": "gemini",
+            "max_steps": 3,
+        },
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["ticker"] == "AAPL"
+    assert "critic_passed" in body
+    assert isinstance(body["answer"], str) and len(body["answer"]) > 0
+    assert body["model_used"] == "gemini"
