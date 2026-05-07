@@ -1,4 +1,5 @@
 import { getApiBase, readErrorMessage } from "@/lib/auth-api";
+import { getAccessToken } from "@/lib/auth";
 import type {
   ChatQueryRequest,
   ChatQueryResponse,
@@ -7,6 +8,13 @@ import type {
   NewsSentimentResponse,
   ThreadHistoryResponse,
 } from "@/lib/revati-types";
+
+function authHeaders(): HeadersInit {
+  const token = getAccessToken();
+  return token
+    ? { "Content-Type": "application/json", Authorization: `Bearer ${token}` }
+    : { "Content-Type": "application/json" };
+}
 
 function normalizeChatQueryResponse(raw: unknown): ChatQueryResponse {
   const r = raw as Record<string, unknown>;
@@ -41,7 +49,7 @@ export async function postChatQuery(query: string, threadId?: string | null): Pr
   const body: ChatQueryRequest = { query, thread_id: threadId ?? null };
   const res = await fetch(`${getApiBase()}/api/chat/query`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders(),
     body: JSON.stringify(body),
     cache: "no-store",
   });
@@ -69,7 +77,7 @@ export type NewsSentimentRequestBody = {
 export async function postNewsSentiment(body: NewsSentimentRequestBody): Promise<NewsSentimentResponse> {
   const res = await fetch(`${getApiBase()}/api/analysis/news-sentiment`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders(),
     body: JSON.stringify({
       ticker: body.ticker.trim(),
       date_from: body.date_from ?? null,
@@ -86,7 +94,7 @@ export async function postNewsSentiment(body: NewsSentimentRequestBody): Promise
 }
 
 export async function fetchHistory(): Promise<HistoryResponse> {
-  const res = await fetch(`${getApiBase()}/api/history`, { cache: "no-store" });
+  const res = await fetch(`${getApiBase()}/api/history`, { headers: authHeaders(), cache: "no-store" });
   if (!res.ok) {
     throw new Error(await readErrorMessage(res));
   }
@@ -95,7 +103,7 @@ export async function fetchHistory(): Promise<HistoryResponse> {
 
 export async function fetchThreadHistory(threadId: string): Promise<ThreadHistoryResponse> {
   const id = threadId.trim();
-  const res = await fetch(`${getApiBase()}/api/history/thread/${encodeURIComponent(id)}`, { cache: "no-store" });
+  const res = await fetch(`${getApiBase()}/api/history/thread/${encodeURIComponent(id)}`, { headers: authHeaders(), cache: "no-store" });
   if (!res.ok) {
     throw new Error(await readErrorMessage(res));
   }
@@ -106,7 +114,7 @@ export async function fetchMemorySummary(sessionId: string = "default"): Promise
   const sid = sessionId.trim() || "default";
   const res = await fetch(
     `${getApiBase()}/api/history/memory-summary?session_id=${encodeURIComponent(sid)}`,
-    { cache: "no-store" },
+    { headers: authHeaders(), cache: "no-store" },
   );
   if (!res.ok) {
     throw new Error(await readErrorMessage(res));

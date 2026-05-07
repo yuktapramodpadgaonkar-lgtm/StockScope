@@ -1,4 +1,12 @@
 import { getApiBase, readErrorMessage } from "@/lib/auth-api";
+import { getAccessToken } from "@/lib/auth";
+
+function authHeaders(): HeadersInit {
+  const token = getAccessToken();
+  return token
+    ? { "Content-Type": "application/json", Authorization: `Bearer ${token}` }
+    : { "Content-Type": "application/json" };
+}
 
 export type AgenticResearchRequest = {
   ticker: string;
@@ -36,7 +44,7 @@ export type AgenticResearchResponse = {
 export async function postAgenticResearch(body: AgenticResearchRequest): Promise<AgenticResearchResponse> {
   const res = await fetch(`${getApiBase()}/api/agentic-research/run`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders(),
     body: JSON.stringify({
       ticker: body.ticker.trim().toUpperCase(),
       question: body.question.trim(),
