@@ -1,6 +1,6 @@
 # Buy/Sell roadmap — implementation status by phase
 
-This document tracks **Phases 1–8** from [`docs/BuySellAnalysis-roadmap.md`](../BuySellAnalysis-roadmap.md) against the **StockScope** codebase. It is the single place to see **done vs. not done** for the Kavout-style Buy/Sell analysis track.
+This document tracks **Phases 1–8** from [`docs/BuySellAnalysis-roadmap.md`](../BuySellAnalysis-roadmap.md) against the **StockScope** codebase. It is the single place to see **done vs. not done** for the structured Buy/Sell analysis track.
 
 **Last reviewed:** aligned with repo layout under `StockScope/` (backend FastAPI + Next.js frontend).
 
@@ -68,7 +68,7 @@ This document tracks **Phases 1–8** from [`docs/BuySellAnalysis-roadmap.md`](.
 | Advisory block (not replacing numeric engine) | `llm_review` on `BuySellReport`; `include_llm_review` + `BUYSELL_LLM_*` / HF env in [`backend/app/core/config.py`](../../backend/app/core/config.py) |
 | Citations from tools + retrieval | Layer 1 citations + RAG chunk ids on `citations`; LLM `citations_used` constrained to retrieval ids in prompt |
 
-**Gap vs. ideal roadmap wording:** the LLM today primarily drives the **`llm_review`** advisory JSON (rationale, suggested scores, warnings)—not a full **rewrite of every narrative section** of the Kavout-style report. Full “section writer” for each long-form field can be a future increment.
+**Gap vs. ideal roadmap wording:** the LLM today primarily drives the **`llm_review`** advisory JSON (rationale, suggested scores, warnings)—not a full **rewrite of every narrative section** of the structured report. Full “section writer” for each long-form field can be a future increment.
 
 ---
 

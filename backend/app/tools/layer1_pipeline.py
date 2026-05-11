@@ -41,6 +41,9 @@ def get_layer1_for_llm(
     period: str = "1y",
     interval: str = "1d",
     news_limit: int = 20,
+    include_filings: bool = True,
+    include_news_enrichment: bool = True,
+    include_analyst_enrichment: bool = True,
 ) -> dict[str, Any]:
     sym = ticker.strip().upper()
     ledger: dict[str, int] = {
@@ -76,17 +79,27 @@ def get_layer1_for_llm(
     # News + sentiment: Alpha Vantage preferred (1 call), else yfinance news (1 call)
     av_news: dict[str, Any]
     av_calls = 0
-    try:
-        av_news, av_calls = fetch_news_sentiment(sym, limit=news_limit)
-    except Exception as e:
+    if include_news_enrichment:
+        try:
+            av_news, av_calls = fetch_news_sentiment(sym, limit=news_limit)
+        except Exception as e:
+            av_news = {
+                "ticker": sym,
+                "source": "alpha_vantage",
+                "error": "request_failed",
+                "detail": str(e)[:300],
+                "items": [],
+            }
+            av_calls = 0
+    else:
         av_news = {
             "ticker": sym,
             "source": "alpha_vantage",
-            "error": "request_failed",
-            "detail": str(e)[:300],
+            "skipped": True,
+            "reason": "News enrichment disabled for fast path.",
             "items": [],
+            "feed": [],
         }
-        av_calls = 0
 
     ledger["alpha_vantage"] += av_calls
     if av_calls == 0:
@@ -113,17 +126,26 @@ def get_layer1_for_llm(
     # Analyst trends: Finnhub (1 call) or fields from info (0 extra)
     fh_rec: dict[str, Any]
     fh_calls = 0
-    try:
-        fh_rec, fh_calls = fetch_recommendation_trends(sym)
-    except Exception as e:
+    if include_analyst_enrichment:
+        try:
+            fh_rec, fh_calls = fetch_recommendation_trends(sym)
+        except Exception as e:
+            fh_rec = {
+                "ticker": sym,
+                "source": "finnhub",
+                "error": "request_failed",
+                "detail": str(e)[:300],
+                "trend": [],
+            }
+            fh_calls = 0
+    else:
         fh_rec = {
             "ticker": sym,
             "source": "finnhub",
-            "error": "request_failed",
-            "detail": str(e)[:300],
+            "skipped": True,
+            "reason": "Analyst enrichment disabled for fast path.",
             "trend": [],
         }
-        fh_calls = 0
 
     ledger["finnhub"] += fh_calls
     if fh_calls == 0:
@@ -139,8 +161,17 @@ def get_layer1_for_llm(
             "consensus": _analyst_from_info_only(info),
         }
 
-    filings = get_filings_or_transcripts(sym)
-    ledger["sec_edgar"] += int(filings.get("http_calls") or 0)
+    if include_filings:
+        filings = get_filings_or_transcripts(sym)
+        ledger["sec_edgar"] += int(filings.get("http_calls") or 0)
+    else:
+        filings = {
+            "ticker": sym,
+            "source": "none_yet",
+            "items": [],
+            "http_calls": 0,
+            "note": "Skipped filings fetch for this request path.",
+        }
 
     data_lineage: dict[str, str] = {
         "price_history": "yfinance Ticker.history (single fetch shared with technicals)",

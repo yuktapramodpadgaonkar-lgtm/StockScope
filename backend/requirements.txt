@@ -17,8 +17,9 @@ python-jose[cryptography]  # JWT signing / verification
 passlib[bcrypt]            # password hashing
 bcrypt<4.0                 # passlib 1.7.4 is incompatible with bcrypt >= 4.0
 # ── LLM providers ─────────────────────────────────────────────────────────────
-# Gemini and Ollama (LLaMA / Mistral) are called via httpx REST.
-# No extra SDK packages required. FinBERT also uses the HF Inference REST API.
+# Gemini and Ollama (LLaMA / Mistral) use httpx REST. Buy/Sell HF instruct models may use
+# huggingface_hub.InferenceClient chat (router / provider ids like Qwen/...:featherless-ai).
+huggingface_hub>=0.26.0
 # Add these keys to backend/.env:
 #   GEMINI_API_KEY=...
 #   HUGGINGFACE_API_TOKEN=...   (for FinBERT sentiment + RAG embeddings)

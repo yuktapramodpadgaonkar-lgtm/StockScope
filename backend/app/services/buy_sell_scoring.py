@@ -200,6 +200,14 @@ def score_technicals(bundle: dict[str, Any]) -> DimensionRuleScore:
     )
 
 
+def _news_snippet_for_finbert(item: dict[str, Any]) -> str:
+    title = str(item.get("title") or item.get("headline") or "").strip()
+    summary = str(item.get("summary") or item.get("text") or "").strip()
+    combined = f"{title}. {summary}".strip()
+    out = combined if combined else title
+    return out[:800]
+
+
 def score_sentiment(bundle: dict[str, Any]) -> DimensionRuleScore:
     ns = bundle.get("news_and_sentiment") or {}
     av_items = ((ns.get("alpha_vantage") or {}).get("items") or []) if ns else []
@@ -214,29 +222,80 @@ def score_sentiment(bundle: dict[str, Any]) -> DimensionRuleScore:
 
     pos = 0
     neg = 0
+    neu = 0
     sample = av_items if av_items else yf_items
+    texts: list[str] = []
     for item in sample[:20]:
-        if not isinstance(item, dict):
-            continue
-        lbl = str(item.get("overall_sentiment_label") or "").lower()
-        title = str(item.get("title") or "").lower()
-        if "bull" in lbl or "positive" in lbl:
-            pos += 1
-        elif "bear" in lbl or "negative" in lbl:
-            neg += 1
-        else:
-            for k in ("beat", "upgrade", "growth", "surge", "strong", "record"):
-                if k in title:
-                    pos += 1
-                    break
-            for k in ("miss", "downgrade", "lawsuit", "cut", "weak", "decline"):
-                if k in title:
-                    neg += 1
-                    break
+        if isinstance(item, dict):
+            snip = _news_snippet_for_finbert(item)
+            if snip:
+                texts.append(snip)
 
-    total = max(1, pos + neg)
-    balance = (pos - neg) / total
-    add("headline_balance", round(balance, 3), balance * 20.0, "Positive vs negative headline tilt.")
+    use_finbert = bool(
+        settings.finbert_enabled
+        and (settings.huggingface_api_token or "").strip()
+        and texts
+    )
+
+    if use_finbert:
+        from services.news_sentiment_service import classify_finbert_batch
+
+        for lbl in classify_finbert_batch(texts):
+            if lbl == "positive":
+                pos += 1
+            elif lbl == "negative":
+                neg += 1
+            else:
+                neu += 1
+        total = max(1, pos + neg + neu)
+        balance = (pos - neg) / total
+        add(
+            "headline_balance",
+            round(balance, 3),
+            balance * 20.0,
+            f"FinBERT headline tilt (pos={pos}, neg={neg}, neu={neu}) via {settings.finbert_model_id}.",
+        )
+        add(
+            "sentiment_source",
+            "finbert",
+            0.0,
+            "Sentiment score used FinBERT (Hugging Face Inference); independent of the AI model dropdown.",
+        )
+    else:
+        for item in sample[:20]:
+            if not isinstance(item, dict):
+                continue
+            lbl = str(item.get("overall_sentiment_label") or "").lower()
+            title = str(item.get("title") or "").lower()
+            if "bull" in lbl or "positive" in lbl:
+                pos += 1
+            elif "bear" in lbl or "negative" in lbl:
+                neg += 1
+            else:
+                for k in ("beat", "upgrade", "growth", "surge", "strong", "record"):
+                    if k in title:
+                        pos += 1
+                        break
+                for k in ("miss", "downgrade", "lawsuit", "cut", "weak", "decline"):
+                    if k in title:
+                        neg += 1
+                        break
+
+        total = max(1, pos + neg)
+        balance = (pos - neg) / total
+        if settings.finbert_enabled and (settings.huggingface_api_token or "").strip() and not texts:
+            why = "Keyword heuristic — no non-empty headlines to classify."
+        elif not settings.finbert_enabled or not (settings.huggingface_api_token or "").strip():
+            why = "Keyword heuristic (enable FINBERT and set HUGGINGFACE_API_TOKEN for FinBERT)."
+        else:
+            why = "Alpha Vantage / keyword cues (FinBERT not applied for this run)."
+        add("headline_balance", round(balance, 3), balance * 20.0, f"Positive vs negative headline tilt. {why}")
+        add(
+            "sentiment_source",
+            "keyword_heuristic",
+            0.0,
+            "Sentiment score did not use FinBERT; see headline_balance.",
+        )
 
     coverage = min(len(sample), 20) / 20.0
     if coverage >= 0.5:
@@ -330,22 +389,76 @@ def _llm_review_stub(
     )
 
 
+def _scoring_signal_reasons(f: DimensionRuleScore, t: DimensionRuleScore, s: DimensionRuleScore) -> list[str]:
+    return [sig.reason for sig in (f.signals + t.signals + s.signals) if sig.points != 0][:8]
+
+
+def _finance_facts_from_bundle(bundle: dict[str, Any]) -> list[str]:
+    fields = (bundle.get("fundamentals") or {}).get("fields") or {}
+    indicators = (bundle.get("technical_indicators") or {}).get("indicators") or {}
+    out: list[str] = []
+    rg = _to_float(fields.get("revenueGrowth"))
+    if rg is not None:
+        out.append(f"Revenue growth: {rg:.3f}")
+    eg = _to_float(fields.get("earningsGrowth"))
+    if eg is not None:
+        out.append(f"Earnings growth: {eg:.3f}")
+    pm = _to_float(fields.get("profitMargins"))
+    if pm is not None:
+        out.append(f"Profit margin: {pm:.3f}")
+    pe = _to_float(fields.get("trailingPE"))
+    if pe is not None:
+        out.append(f"Trailing P/E: {pe:.2f}")
+    d2e = _to_float(fields.get("debtToEquity"))
+    if d2e is not None:
+        out.append(f"Debt-to-equity: {d2e:.2f}")
+    rsi = _to_float(indicators.get("rsi_14"))
+    if rsi is not None:
+        out.append(f"RSI-14: {rsi:.2f}")
+    macd = str(indicators.get("macd_label") or "").strip()
+    if macd:
+        out.append(f"MACD regime: {macd}")
+    return out[:8]
+
+
+def _contradiction_risks(
+    overall: OverallRuleScore,
+    f: DimensionRuleScore,
+    t: DimensionRuleScore,
+    s: DimensionRuleScore,
+) -> list[str]:
+    risks: list[str] = []
+    spread = max(f.score, t.score, s.score) - min(f.score, t.score, s.score)
+    if spread >= 35:
+        risks.append(
+            f"High cross-dimension dispersion ({spread}) suggests mixed signals; headline recommendation can be brittle."
+        )
+    if overall.confidence < 45:
+        risks.append("Low confidence indicates weak data completeness or weak agreement between dimensions.")
+    if f.data_completeness < 0.6 or t.data_completeness < 0.6 or s.data_completeness < 0.6:
+        risks.append("At least one scoring pillar has limited data coverage, which can skew the composite.")
+    if any(sig.name == "coverage_depth" and sig.points < 0 for sig in s.signals):
+        risks.append("News coverage depth is limited; sentiment read may miss key catalysts.")
+    if not risks:
+        risks.append("No major contradictions flagged in this snapshot, but rapid market/news shifts can invalidate signals.")
+    return risks[:4]
+
+
 def _build_llm_review_via_service(
     ticker: str,
     overall: OverallRuleScore,
     f: DimensionRuleScore,
     t: DimensionRuleScore,
     s: DimensionRuleScore,
+    bundle: dict[str, Any] | None,
     preferred_model: str,
 ) -> LlmReview:
-    """Use LLMService (Gemini → LLaMA → Mistral) to explain the deterministic scores."""
+    """Use LLMService (Gemini → LLaMA → Mistral) to explain the deterministic scores (fallback)."""
     from services.buy_sell_llm_service import generate_buy_sell_explanation
 
-    signals = [
-        sig.reason
-        for sig in (f.signals + t.signals + s.signals)
-        if sig.points != 0
-    ][:8]
+    signals = _scoring_signal_reasons(f, t, s)
+    finance_facts = _finance_facts_from_bundle(bundle or {})
+    contradiction_warnings = _contradiction_risks(overall, f, t, s)
 
     rationale, model_used, provider_used = generate_buy_sell_explanation(
         ticker=ticker,
@@ -355,6 +468,7 @@ def _build_llm_review_via_service(
         technical_score=t.score,
         sentiment_score=s.score,
         signals=signals,
+        finance_facts=finance_facts,
         preferred_model=preferred_model,
     )
 
@@ -370,7 +484,7 @@ def _build_llm_review_via_service(
         ),
         agreement_with_rules=LlmAgreement(matches_recommendation=True, overall_score_delta=0),
         rationale=rationale,
-        warnings=[],
+        warnings=contradiction_warnings,
     )
 
 
@@ -382,13 +496,34 @@ def _build_llm_review(
     s: DimensionRuleScore,
     *,
     include_llm_review: bool,
+    bundle: dict[str, Any] | None = None,
     retrieval_chunks: list[dict[str, Any]] | None = None,
-    preferred_model: str = "gemini",
+    preferred_model: str = "hf_qwen",
 ) -> LlmReview:
     if not include_llm_review:
         return _llm_review_stub(overall, f, t, s, enabled=False)
 
-    # Try HuggingFace if explicitly configured
+    pref = (preferred_model or "hf_qwen").strip().lower()
+    sig_for_narrative = _scoring_signal_reasons(f, t, s)
+
+    # FinBERT+RAG narrative only when explicitly selected (`finbert` in dropdown).
+    if bundle is not None and settings.buysell_llm_enabled and pref == "finbert":
+        from services.buy_sell_llm_service import finbert_buy_sell_llm_review
+
+        fin = finbert_buy_sell_llm_review(
+            ticker=ticker.upper(),
+            overall=overall,
+            fundamental=f,
+            technical=t,
+            sentiment=s,
+            bundle=bundle,
+            retrieval_chunks=retrieval_chunks,
+            signals=sig_for_narrative,
+        )
+        if fin is not None:
+            return fin.model_copy(update={"warnings": [*fin.warnings, *_contradiction_risks(overall, f, t, s)]})
+
+    # Try HuggingFace text-generation review if explicitly configured
     hf_provider = (settings.buysell_llm_provider or "none").strip().lower()
     if settings.buysell_llm_enabled and hf_provider == "huggingface":
         try:
@@ -411,6 +546,7 @@ def _build_llm_review(
         f,
         t,
         s,
+        bundle=bundle,
         preferred_model=preferred_model,
     )
 
@@ -421,7 +557,7 @@ def build_buy_sell_report_from_layer1(
     *,
     include_llm_review: bool = False,
     retrieved_chunks: list[dict[str, Any]] | None = None,
-    preferred_model: str = "gemini",
+    preferred_model: str = "hf_qwen",
 ) -> BuySellReport:
     weights = ScoreWeights()
     f = score_fundamentals(bundle)
@@ -447,6 +583,19 @@ def build_buy_sell_report_from_layer1(
     implied = None
     if dcf_proxy is not None and price not in (None, 0):
         implied = ((dcf_proxy - price) / price) * 100.0
+
+    def _sentiment_verdict(sd: DimensionRuleScore) -> str:
+        for sig in sd.signals:
+            if sig.name == "sentiment_source" and str(sig.value) == "finbert":
+                return (
+                    "Sentiment score incorporates FinBERT on recent headlines. "
+                    "For the written explanation, choose “FinBERT” in the model menu for label+RAG narrative; "
+                    "choose Qwen/Mistral (HF) or Gemini/Llama/Ollama-Mistral for generative text."
+                )
+        return (
+            "Sentiment score uses Alpha Vantage / keyword cues when FinBERT is off, the HF token is missing, "
+            "or headlines are empty — enable FINBERT and set HUGGINGFACE_API_TOKEN for neural classification."
+        )
 
     citations: list[CitationItem] = [
         CitationItem(
@@ -490,11 +639,13 @@ def build_buy_sell_report_from_layer1(
         t=t,
         s=s,
         include_llm_review=include_llm_review,
+        bundle=bundle,
         retrieval_chunks=retrieved_chunks,
         preferred_model=preferred_model,
     )
+    contradiction_notes = _contradiction_risks(overall, f, t, s)
 
-    return BuySellReport(
+    report = BuySellReport(
         ticker=ticker.upper(),
         recommendation=overall.recommendation,
         confidence=overall.confidence,
@@ -548,7 +699,7 @@ def build_buy_sell_report_from_layer1(
             recent_developments=[
                 str(x.get("title") or x.get("summary") or "") for x in news_items[:5] if isinstance(x, dict)
             ],
-            verdict="Sentiment score is driven by headline polarity balance and coverage depth.",
+            verdict=_sentiment_verdict(s),
         ),
         final_verdict=FinalVerdict(
             overall_score=int(round(overall.weighted_score)),
@@ -557,9 +708,7 @@ def build_buy_sell_report_from_layer1(
                 "Final rating combines weighted deterministic scores with a confidence metric "
                 "from data completeness and cross-dimension agreement."
             ),
-            conflicts=(
-                "High score dispersion across dimensions lowers confidence and indicates mixed setup."
-            ),
+            conflicts=" ".join(contradiction_notes),
         ),
         risk_assessment=RiskAssessment(
             key_risks=[
@@ -580,3 +729,19 @@ def build_buy_sell_report_from_layer1(
         llm_review=llm_review,
         citations=citations,
     )
+
+    if include_llm_review and settings.buysell_llm_enabled:
+        try:
+            from services.buy_sell_structured_narrative import generate_buy_sell_ai_narratives
+
+            narr = generate_buy_sell_ai_narratives(
+                bundle,
+                report,
+                preferred_model=preferred_model,
+            )
+            if narr is not None:
+                report = report.model_copy(update={"ai_narratives": narr})
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Structured AI narratives skipped for %s: %s", ticker, exc)
+
+    return report

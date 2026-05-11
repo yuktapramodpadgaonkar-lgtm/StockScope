@@ -24,7 +24,7 @@ def run_buy_sell_with_agents(
     horizon: str | None = None,
     retrieval_query: str | None = None,
     memory_hint: str | None = None,
-    preferred_model: str = "gemini",
+    preferred_model: str = "hf_qwen",
 ) -> BuySellReport:
     """
     Phase 6 entrypoint: plan → execute → attach critic metadata to the report.

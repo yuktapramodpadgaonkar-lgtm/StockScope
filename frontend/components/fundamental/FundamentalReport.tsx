@@ -45,7 +45,7 @@ type FundamentalReportProps = {
 
 export function FundamentalReport({ defaultTicker = "" }: FundamentalReportProps) {
   const [input, setInput] = useState(defaultTicker);
-  const [llmChoice, setLlmChoice] = useState<"mistral" | "llama" | "gemini">("mistral");
+  const [llmChoice, setLlmChoice] = useState<"mistral" | "llama" | "gemini">("llama");
   const [includeRag, setIncludeRag] = useState(true);
   const [report, setReport] = useState<FundamentalAnalysisResponse | null>(null);
   const [hasSearched, setHasSearched] = useState(false);

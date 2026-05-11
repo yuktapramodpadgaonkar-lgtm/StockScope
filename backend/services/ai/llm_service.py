@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 # ── Timeouts ──────────────────────────────────────────────────────────────────
 _GEMINI_TIMEOUT = 30
-_OLLAMA_TIMEOUT = 120   # local inference is slower
+_OLLAMA_TIMEOUT = 120   # default; can be overridden per request
 
 # ── Provider → (model_used label, provider label) ────────────────────────────
 _PROVIDER_META: dict[str, tuple[str, str]] = {
@@ -50,13 +50,13 @@ class LLMService:
 
     Usage:
         svc = LLMService()
-        result = svc.generate_response(prompt, preferred_model="gemini")
+        result = svc.generate_response(prompt, preferred_model=settings.default_llm_provider)
         print(result.response, result.model_used, result.provider)
     """
 
     # ── Gemini ─────────────────────────────────────────────────────────────────
 
-    def generate_with_gemini(self, prompt: str) -> str:
+    def generate_with_gemini(self, prompt: str, *, max_output_tokens: int = 1024) -> str:
         """
         Call Google Gemini via the generateContent REST API.
 
@@ -76,7 +76,10 @@ class LLMService:
         }
         payload: dict[str, Any] = {
             "contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {"temperature": 0.3, "maxOutputTokens": 1024},
+            "generationConfig": {
+                "temperature": 0.3,
+                "maxOutputTokens": max(256, min(int(max_output_tokens), 8192)),
+            },
         }
 
         with httpx.Client(timeout=_GEMINI_TIMEOUT) as client:
@@ -93,7 +96,13 @@ class LLMService:
 
     # ── Ollama ─────────────────────────────────────────────────────────────────
 
-    def _ollama_generate(self, model_id: str, prompt: str) -> str:
+    def _ollama_generate(
+        self,
+        model_id: str,
+        prompt: str,
+        *,
+        timeout_seconds: int | None = None,
+    ) -> str:
         """
         Call the local Ollama /api/generate endpoint.
 
@@ -108,8 +117,9 @@ class LLMService:
             "stream": False,
         }
 
+        timeout_s = int(timeout_seconds or settings.ollama_timeout_seconds or _OLLAMA_TIMEOUT)
         try:
-            with httpx.Client(timeout=_OLLAMA_TIMEOUT) as client:
+            with httpx.Client(timeout=timeout_s) as client:
                 r = client.post(url, json=payload)
                 r.raise_for_status()
         except httpx.ConnectError as exc:
@@ -119,7 +129,7 @@ class LLMService:
             ) from exc
         except httpx.TimeoutException as exc:
             raise RuntimeError(
-                f"Ollama timed out after {_OLLAMA_TIMEOUT}s for model '{model_id}'."
+                f"Ollama timed out after {timeout_s}s for model '{model_id}'."
             ) from exc
 
         data = r.json()
@@ -130,7 +140,12 @@ class LLMService:
             )
         return response_text
 
-    def generate_with_ollama_llama(self, prompt: str) -> str:
+    def generate_with_ollama_llama(
+        self,
+        prompt: str,
+        *,
+        timeout_seconds: int | None = None,
+    ) -> str:
         """
         Call Ollama with llama3.1:8b.
 
@@ -138,9 +153,14 @@ class LLMService:
             RuntimeError: if Ollama is unreachable or the model is not pulled.
         """
         model_id = (settings.ollama_llama_model or "llama3.1:8b").strip()
-        return self._ollama_generate(model_id, prompt)
+        return self._ollama_generate(model_id, prompt, timeout_seconds=timeout_seconds)
 
-    def generate_with_ollama_mistral(self, prompt: str) -> str:
+    def generate_with_ollama_mistral(
+        self,
+        prompt: str,
+        *,
+        timeout_seconds: int | None = None,
+    ) -> str:
         """
         Call Ollama with mistral:7b.
 
@@ -148,14 +168,17 @@ class LLMService:
             RuntimeError: if Ollama is unreachable or the model is not pulled.
         """
         model_id = (settings.ollama_mistral_model or "mistral:7b").strip()
-        return self._ollama_generate(model_id, prompt)
+        return self._ollama_generate(model_id, prompt, timeout_seconds=timeout_seconds)
 
     # ── Unified entry point ────────────────────────────────────────────────────
 
     def generate_response(
         self,
         prompt: str,
-        preferred_model: str = "gemini",
+        preferred_model: str | None = None,
+        *,
+        ollama_timeout_seconds: int | None = None,
+        gemini_max_output_tokens: int | None = None,
     ) -> LLMResponse:
         """
         Try providers in priority order; return on the first success.
@@ -165,28 +188,38 @@ class LLMService:
           preferred_model="llama"   → llama  → gemini → mistral
           preferred_model="mistral" → mistral → gemini → llama
 
+        When preferred_model is omitted, uses `settings.default_llm_provider`.
+
         Returns:
             LLMResponse with model_used, provider, response, fallback_used, error.
             On total failure, response is "" and error is set — never raises.
         """
-        key = (preferred_model or "gemini").strip().lower()
+        key = (preferred_model or settings.default_llm_provider or "gemini").strip().lower()
         order = _FALLBACK_ORDERS.get(key, _FALLBACK_ORDERS["gemini"])
 
-        _generators = {
-            "gemini":  self.generate_with_gemini,
-            "llama":   self.generate_with_ollama_llama,
-            "mistral": self.generate_with_ollama_mistral,
-        }
+        gemini_tokens = int(gemini_max_output_tokens) if gemini_max_output_tokens is not None else 1024
+
+        def _run(name: str) -> str:
+            if name == "gemini":
+                return self.generate_with_gemini(prompt, max_output_tokens=gemini_tokens)
+            if name == "llama":
+                return self.generate_with_ollama_llama(
+                    prompt,
+                    timeout_seconds=ollama_timeout_seconds,
+                )
+            if name == "mistral":
+                return self.generate_with_ollama_mistral(
+                    prompt,
+                    timeout_seconds=ollama_timeout_seconds,
+                )
+            raise RuntimeError(f"Unknown provider '{name}'")
 
         last_error: str = ""
         for idx, name in enumerate(order):
-            generator = _generators.get(name)
-            if generator is None:
-                continue
             model_label, provider_label = _PROVIDER_META[name]
             t0 = time.perf_counter()
             try:
-                text = generator(prompt)
+                text = _run(name)
                 ms = (time.perf_counter() - t0) * 1000.0
                 log_model_call(
                     provider=provider_label,

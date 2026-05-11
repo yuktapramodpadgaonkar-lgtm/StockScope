@@ -49,7 +49,7 @@ export async function postAgenticResearch(body: AgenticResearchRequest): Promise
       ticker: body.ticker.trim().toUpperCase(),
       question: body.question.trim(),
       session_id: body.session_id ?? "default",
-      preferred_model: body.preferred_model ?? "gemini",
+      preferred_model: body.preferred_model ?? "llama",
       max_steps: body.max_steps ?? 3,
       require_two_tools: body.require_two_tools ?? true,
       include_buy_sell: body.include_buy_sell ?? true,

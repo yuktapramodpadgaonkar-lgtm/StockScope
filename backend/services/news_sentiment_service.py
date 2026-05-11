@@ -179,8 +179,9 @@ def _heuristic_sentiment(text: str) -> SentimentLabel:
 
 def _classify_finbert_batch(texts: list[str]) -> list[SentimentLabel]:
     """
-    Classify a batch of texts with ProsusAI/finbert via the HF Inference API.
-    Falls back to heuristic for the whole batch on any error.
+    Classify a batch of texts with ProsusAI/finbert via huggingface_hub.InferenceClient
+    (routed inference; replaces the deprecated /api-inference REST endpoint).
+    Falls back to heuristic per item on any error.
     """
     if not settings.finbert_enabled:
         return [_heuristic_sentiment(t) for t in texts]
@@ -189,35 +190,55 @@ def _classify_finbert_batch(texts: list[str]) -> list[SentimentLabel]:
     if not token:
         return [_heuristic_sentiment(t) for t in texts]
 
-    url = f"https://api-inference.huggingface.co/models/{settings.finbert_model_id}"
-    headers = {"Authorization": f"Bearer {token}"}
-
     try:
-        with httpx.Client(timeout=20) as client:
-            r = client.post(url, headers=headers, json={"inputs": texts})
-            r.raise_for_status()
-        data = r.json()
+        from huggingface_hub import InferenceClient
     except Exception:  # noqa: BLE001
         return [_heuristic_sentiment(t) for t in texts]
 
-    if not isinstance(data, list):
+    try:
+        client = InferenceClient(api_key=token, timeout=30.0)
+    except Exception:  # noqa: BLE001
         return [_heuristic_sentiment(t) for t in texts]
 
     results: list[SentimentLabel] = []
-    for i, item in enumerate(data):
+    for i, text in enumerate(texts):
+        snippet = (text or "").strip()
+        if not snippet:
+            results.append("neutral")
+            continue
         try:
-            best = max(item, key=lambda x: x["score"])
-            label = best["label"].lower()
+            preds = client.text_classification(
+                snippet[:2000],
+                model=settings.finbert_model_id,
+            )
+            best = max(
+                preds,
+                key=lambda p: float(getattr(p, "score", 0.0) or 0.0),
+            )
+            label = str(getattr(best, "label", "")).lower()
             if label in ("positive", "negative", "neutral"):
                 results.append(label)  # type: ignore[arg-type]
             else:
-                results.append(_heuristic_sentiment(texts[i]))
-        except Exception:  # noqa: BLE001
-            results.append(_heuristic_sentiment(texts[i]))
+                results.append(_heuristic_sentiment(snippet))
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "FinBERT InferenceClient classification failed (%s); falling back to heuristic.",
+                str(exc)[:200],
+            )
+            results.append(_heuristic_sentiment(snippet))
 
     while len(results) < len(texts):
         results.append("neutral")
     return results
+
+
+def classify_finbert_batch(texts: list[str]) -> list[SentimentLabel]:
+    """
+    Classify headline/article snippets with FinBERT (HF Inference API) or heuristic fallback.
+
+    Shared with Buy/Sell sentiment scoring; keeps one implementation for API + fallback behavior.
+    """
+    return _classify_finbert_batch(texts)
 
 
 # ── LLM themes + summary ──────────────────────────────────────────────────────
@@ -496,7 +517,7 @@ def build_news_sentiment_report(
             rag_block = _format_news_rag_block(retrieved)
 
     # Step 3: LLM themes + summary
-    preferred = (model_name or "gemini").strip().lower()
+    preferred = (model_name or settings.default_llm_provider or "gemini").strip().lower()
     themes, summary, llm_model, llm_provider, llm_fallback = (
         _generate_themes_and_summary(sym, enriched, preferred, rag_block=rag_block)
     )

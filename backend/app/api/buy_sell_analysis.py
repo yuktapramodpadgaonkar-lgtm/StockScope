@@ -22,7 +22,7 @@ def _finalize_memory(report: BuySellReport, session_id: str, ticker: str) -> Buy
 
 @router.get("/report/mock", response_model=BuySellReport)
 def get_mock_report() -> BuySellReport:
-    """Phase 1: sample Kavout-style report for UI contract testing."""
+    """Phase 1: sample Buy/Sell report for UI contract testing."""
     return mock_buy_sell_report()
 
 
@@ -83,8 +83,11 @@ def analyze_ticker(
         description="If true and memory is enabled, persist ticker to session and attach memory block to the report.",
     ),
     preferred_model: str = Query(
-        default="gemini",
-        description="Preferred LLM model for advisory review (gemini | llama | mistral).",
+        default="hf_qwen",
+        description=(
+            "Explanation model: hf_qwen (default) | hf_mistral_instruct | finbert | gemini | llama | mistral (Ollama). "
+            "HF options use HUGGINGFACE_API_TOKEN; finbert uses label+RAG narrative (not generative)."
+        ),
     ),
 ) -> BuySellReport:
     """
@@ -120,6 +123,9 @@ def analyze_ticker(
             period=period,
             interval=interval,
             news_limit=news_limit,
+            include_filings=include_retrieval,
+            include_news_enrichment=include_retrieval,
+            include_analyst_enrichment=include_retrieval,
         )
         retrieved: list[dict[str, Any]] = []
         if include_retrieval:

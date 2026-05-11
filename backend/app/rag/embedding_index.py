@@ -66,6 +66,11 @@ def _parse_hf_embeddings(data: Any, batch_len: int) -> list[list[float]]:
 
 
 def _hf_embed_batch(texts: list[str]) -> np.ndarray:
+    """
+    Embed a batch of texts via huggingface_hub.InferenceClient (routed inference).
+    Replaces the deprecated /api-inference REST endpoint that 404s for sentence-transformers.
+    Falls back to legacy REST only if the client import fails.
+    """
     token = (settings.huggingface_api_token or "").strip()
     if not token:
         raise RuntimeError("missing_hf_token")
@@ -74,19 +79,31 @@ def _hf_embed_batch(texts: list[str]) -> np.ndarray:
     if not model_id:
         raise RuntimeError("missing_embedding_model")
 
-    url = f"https://api-inference.huggingface.co/models/{model_id}"
-    headers = {"Authorization": f"Bearer {token}"}
-    out_rows: list[list[float]] = []
-    bs = max(1, int(settings.rag_embedding_batch_size))
+    try:
+        from huggingface_hub import InferenceClient
+    except Exception as exc:  # noqa: BLE001
+        raise RuntimeError(f"huggingface_hub_import_failed: {exc!s}") from exc
 
-    with httpx.Client(timeout=60.0) as client:
-        for i in range(0, len(texts), bs):
-            batch = texts[i : i + bs]
-            payload: dict[str, Any] = {"inputs": batch[0]} if len(batch) == 1 else {"inputs": batch}
-            r = client.post(url, headers=headers, json=payload)
-            r.raise_for_status()
-            parsed = _parse_hf_embeddings(r.json(), len(batch))
-            out_rows.extend(parsed)
+    client = InferenceClient(api_key=token, timeout=60.0)
+    out_rows: list[list[float]] = []
+
+    for text in texts:
+        snippet = (text or "")[:8000]
+        try:
+            vec = client.feature_extraction(snippet, model=model_id)
+        except Exception as exc:  # noqa: BLE001
+            raise RuntimeError(f"feature_extraction_failed: {exc!s}") from exc
+
+        arr = np.asarray(vec, dtype=np.float32)
+        # feature_extraction can return (dim,) or (tokens, dim) — mean-pool the latter.
+        if arr.ndim == 2:
+            arr = arr.mean(axis=0)
+        elif arr.ndim == 3:
+            arr = arr.reshape(-1, arr.shape[-1]).mean(axis=0)
+        elif arr.ndim != 1:
+            raise RuntimeError(f"unexpected_embedding_shape:{arr.shape}")
+
+        out_rows.append(arr.astype(np.float32).tolist())
 
     return np.asarray(out_rows, dtype=np.float32)
 

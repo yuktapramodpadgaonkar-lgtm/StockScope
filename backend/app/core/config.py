@@ -24,7 +24,20 @@ class Settings(BaseSettings):
     buysell_llm_enabled: bool = True
     buysell_llm_model: str = ""  # e.g. FinGPT model id on Hugging Face
     buysell_llm_timeout_seconds: int = 45
-    huggingface_api_token: str = ""
+    # When true, explanation mode "finbert" uses FinBERT+RAG narrative; other dropdown values use HF or LLMService.
+    buysell_explanation_use_finbert: bool = True
+    # Hugging Face Inference — instruction models for Buy/Sell narrative (plain text).
+    hf_buy_sell_instruction_qwen_model_id: str = "Qwen/Qwen2.5-1.5B-Instruct:featherless-ai"
+    hf_buy_sell_instruction_mistral_model_id: str = "mistralai/Mistral-7B-Instruct-v0.3"
+    huggingface_api_token: str = Field(
+        default="",
+        validation_alias=AliasChoices(
+            "HUGGINGFACE_API_TOKEN",
+            "HUGGINGFACE_API_KEY",
+            "HF_TOKEN",
+            "huggingface_api_token",
+        ),
+    )
     hf_model_id: str = ""
     hf_inference_url: str = ""  # optional dedicated endpoint URL
 
@@ -70,8 +83,9 @@ class Settings(BaseSettings):
     )
     ollama_llama_model: str = "llama3.1:8b"
     ollama_mistral_model: str = "mistral:7b"
+    ollama_timeout_seconds: int = 180
 
-    default_llm_provider: str = "gemini"  # gemini | llama | mistral
+    default_llm_provider: str = "llama"  # gemini | llama | mistral
 
     finbert_enabled: bool = True
     finbert_model_id: str = "ProsusAI/finbert"

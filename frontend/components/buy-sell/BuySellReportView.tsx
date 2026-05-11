@@ -12,6 +12,7 @@ import {
   type BuySellModelChoice,
   type BuySellReport,
   type Recommendation,
+  type ScoreSignal,
 } from "@/lib/buy-sell-api";
 
 function scoreBar(label: string, value: number, weight?: number) {
@@ -60,13 +61,72 @@ function BulletList({ items, tone }: { items: string[]; tone: "bull" | "bear" })
   );
 }
 
+function Term({
+  label,
+  fullForm,
+  definition,
+}: {
+  label: string;
+  fullForm: string;
+  definition: string;
+}) {
+  return (
+    <span
+      className="cursor-help underline decoration-dotted underline-offset-2"
+      title={`${fullForm}: ${definition}`}
+      aria-label={`${label}: ${fullForm}. ${definition}`}
+    >
+      {label}
+    </span>
+  );
+}
+
+function ProvenanceAside({ tag, detail }: { tag: string; detail: string }) {
+  return (
+    <aside className="mb-4 rounded-lg border border-dashed border-slate-300 bg-white/80 px-3 py-2 text-[11px] leading-snug text-slate-600">
+      <span className="font-mono font-semibold uppercase tracking-wide text-slate-500">{tag}</span>
+      {" — "}
+      {detail}
+    </aside>
+  );
+}
+
+function AiGenerationBlock({
+  heading,
+  modelLabel,
+  children,
+}: {
+  heading?: string;
+  modelLabel?: string | null;
+  children: string;
+}) {
+  const body = children.trim();
+  if (!body) return null;
+  return (
+    <div className="relative mt-4 overflow-hidden rounded-xl border border-blue-200 bg-blue-50/70 px-4 py-4 text-blue-950 shadow-sm">
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-blue-900">
+          AI-generated
+        </span>
+        {modelLabel ? (
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-blue-800">
+            via {modelLabel}
+          </span>
+        ) : null}
+      </div>
+      {heading ? <p className="mb-2 text-[11px] font-semibold text-blue-900">{heading}</p> : null}
+      <p className="whitespace-pre-wrap text-sm italic leading-relaxed text-blue-900">{body}</p>
+    </div>
+  );
+}
+
 const BS_PHASES = ["Fetching data…", "Scoring…", "Writing explanation…"];
 const BS_PHASE_DELAYS = [0, 4000, 10000];
 
 export function BuySellReportView() {
   const [ticker, setTicker] = useState("");
   const [inputValue, setInputValue] = useState("");
-  const [llmChoice, setLlmChoice] = useState<BuySellModelChoice>("gemini");
+  const [llmChoice, setLlmChoice] = useState<BuySellModelChoice>("hf_qwen");
   const [includeLlmReview, setIncludeLlmReview] = useState(true);
   const [includeRetrieval, setIncludeRetrieval] = useState(false);
   const [report, setReport] = useState<BuySellReport | null>(null);
@@ -145,6 +205,95 @@ export function BuySellReportView() {
     return { layer1, rag };
   }, [report]);
 
+  const dimensionSignals = useMemo(() => {
+    const empty = {
+      fundamental: { pos: [] as ScoreSignal[], neg: [] as ScoreSignal[] },
+      technical: { pos: [] as ScoreSignal[], neg: [] as ScoreSignal[] },
+      sentiment: { pos: [] as ScoreSignal[], neg: [] as ScoreSignal[] },
+    };
+    const rs = report?.scoring_engine?.rule_scores;
+    if (!rs) return empty;
+    const split = (signals: ScoreSignal[]) => ({
+      pos: signals.filter((s) => s.points > 0).slice(0, 3),
+      neg: signals.filter((s) => s.points < 0).slice(0, 3),
+    });
+    return {
+      fundamental: split(rs.fundamental.signals || []),
+      technical: split(rs.technical.signals || []),
+      sentiment: split(rs.sentiment.signals || []),
+    };
+  }, [report]);
+
+  const downloadReport = useCallback(() => {
+    if (!report) return;
+    const contradictionLines: string[] = [
+      report.final_verdict.conflicts,
+      ...(report.agent_pipeline?.critic.flags ?? []),
+      ...(report.agent_pipeline?.critic.notes ?? []),
+      ...(report.llm_review?.warnings ?? []),
+    ].filter(Boolean);
+    const content = [
+      `StockScope Buy/Sell Analysis Report`,
+      `Ticker: ${report.ticker}`,
+      `Recommendation: ${report.recommendation}`,
+      `Overall Score: ${report.final_verdict.overall_score}`,
+      `Confidence: ${report.confidence}`,
+      `Setup Quality: ${report.setup_quality}`,
+      "",
+      "Deterministic Ratings",
+      `- Fundamental: ${report.fundamental_analysis.score} (weight ${report.fundamental_analysis.weight}%)`,
+      `- Technical: ${report.technical_analysis.score} (weight ${report.technical_analysis.weight}%)`,
+      `- Sentiment: ${report.sentiment_analysis.score} (weight ${report.sentiment_analysis.weight}%)`,
+      `- Deterministic thesis: ${report.investment_thesis.summary}`,
+      "",
+      "Potential Contradictions / Failure Risks",
+      ...(contradictionLines.length ? contradictionLines.map((x) => `- ${x}`) : ["- None highlighted in this run."]),
+      "",
+      "AI Explanation",
+      `- Requested model: ${llmChoice}`,
+      `- Resolved model: ${report.llm_review?.model ?? "none"}`,
+      report.llm_review?.rationale ? report.llm_review.rationale : "LLM review unavailable.",
+      "",
+      "AI structured narratives (multi-section LLM)",
+      ...(report.ai_narratives
+        ? [
+            `- Model used: ${report.ai_narratives.model_used}`,
+            "",
+            "--- Thesis expansion ---",
+            report.ai_narratives.thesis_expansion,
+            "",
+            "--- Fundamentals explained ---",
+            report.ai_narratives.fundamentals_explained,
+            "",
+            "--- Technical explained ---",
+            report.ai_narratives.technical_explained,
+            "",
+            "--- Sentiment explained ---",
+            report.ai_narratives.sentiment_explained,
+            "",
+            "--- Final synthesis (AI) ---",
+            report.ai_narratives.final_synthesis_ai,
+            "",
+            "--- Risk commentary (AI) ---",
+            report.ai_narratives.risk_commentary_ai,
+          ]
+        : ["- Not populated for this run (LLM disabled, empty response, or provider error)."]),
+      "",
+      "Citations",
+      ...report.citations.map((c) => `- ${c.title} | ${c.source}${c.url ? ` | ${c.url}` : ""}`),
+      "",
+      "Disclaimer",
+      report.disclaimer,
+    ].join("\n");
+    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${report.ticker}_buy_sell_report.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [report, llmChoice, includeLlmReview]);
+
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="mx-auto max-w-6xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
@@ -179,10 +328,19 @@ export function BuySellReportView() {
                     onChange={(e) => setLlmChoice(e.target.value as BuySellModelChoice)}
                     className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-slate-200"
                   >
+                    <option value="hf_qwen">Qwen 2.5 1.5B Instruct (HF)</option>
+                    <option value="hf_mistral_instruct">Mistral 7B Instruct v0.3 (HF)</option>
+                    <option value="finbert">FinBERT narrative + RAG</option>
                     <option value="gemini">Gemini</option>
-                    <option value="llama">Llama 3.1</option>
-                    <option value="mistral">Mistral</option>
+                    <option value="llama">Llama 3.1 (Ollama)</option>
+                    <option value="mistral">Mistral 7B (Ollama)</option>
                   </select>
+                  <p className="mt-1 max-w-xs text-[10px] leading-snug text-slate-500">
+                    Default <span className="font-mono">hf_qwen</span> hits Hugging Face Inference (needs{" "}
+                    <span className="font-mono">HUGGINGFACE_API_TOKEN</span>).{" "}
+                    <span className="font-mono">finbert</span> builds a label+RAG summary (no generative HF instruct).{" "}
+                    Gemini / Ollama use their usual keys locally or in <span className="font-mono">.env</span>.
+                  </p>
                 </label>
                 <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
                   <input
@@ -209,6 +367,14 @@ export function BuySellReportView() {
                   className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:opacity-50"
                 >
                   {loading ? BS_PHASES[phaseIdx] : "Search"}
+                </button>
+                <button
+                  type="button"
+                  onClick={downloadReport}
+                  disabled={!report}
+                  className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:opacity-50"
+                >
+                  Download report
                 </button>
               </div>
             }
@@ -270,6 +436,44 @@ export function BuySellReportView() {
               <p className="mt-2 text-sm text-amber-900/90">{report.disclaimer}</p>
             </Card>
 
+            <Card className="border-slate-200 bg-white">
+              <h2 className="text-lg font-semibold text-slate-900">How to read this report</h2>
+              <p className="mt-1 text-sm text-slate-600">
+                StockScope separates fixed rule outputs from model-written commentary so you always know what is repeatable
+                versus interpretive.
+              </p>
+              <dl className="mt-4 grid gap-3 text-[11px] leading-snug text-slate-600 sm:grid-cols-2">
+                <div className="rounded-lg border border-slate-100 bg-slate-50/80 p-3">
+                  <dt className="font-mono font-semibold uppercase tracking-wide text-slate-700">Deterministic slate</dt>
+                  <dd className="mt-1">
+                    Scores, drivers, valuations, RSI/MACD/MA fields, citations list, conflicts string, critic flags, and agent
+                    trace come from the scoring engine and tooling — same inputs yields the same numbers.
+                  </dd>
+                </div>
+                <div className="rounded-lg border border-blue-100 bg-blue-50/40 p-3">
+                  <dt className="font-mono font-semibold uppercase tracking-wide text-blue-900">AI narration</dt>
+                  <dd className="mt-1 text-blue-950/90">
+                    Blue italic blocks are written by your selected backend (HF instruct, Gemini, Ollama…) in a structured
+                    JSON pass. They explain what metrics usually mean — they never replace or alter the deterministic
+                    recommendation.
+                  </dd>
+                </div>
+                <div className="rounded-lg border border-violet-100 bg-violet-50/30 p-3">
+                  <dt className="font-mono font-semibold uppercase tracking-wide text-violet-900">Agent pipeline</dt>
+                  <dd className="mt-1">
+                    Shows planner + executor timings when agents are enabled. It documents how Layer1 / RAG / scoring steps ran,
+                    not a second opinion from a trading model.
+                  </dd>
+                </div>
+                <div className="rounded-lg border border-sky-100 bg-sky-50/30 p-3">
+                  <dt className="font-mono font-semibold uppercase tracking-wide text-sky-900">Session memory</dt>
+                  <dd className="mt-1">
+                    Echo of your session id / recent tickers / horizon hints for UX follow-ups — not an extra signal in the math.
+                  </dd>
+                </div>
+              </dl>
+            </Card>
+
             {/* Hero: score + recommendation */}
             <Card className="overflow-hidden p-0 shadow-md ring-1 ring-slate-200/80">
               <div className="grid gap-6 p-6 lg:grid-cols-[1fr_auto] lg:items-center lg:gap-10">
@@ -329,13 +533,75 @@ export function BuySellReportView() {
 
             {/* Thesis */}
             <Card>
+              <ProvenanceAside
+                tag="deterministic thesis"
+                detail="Deterministic pillar summary plus rule-counted drivers. Model expansion below teaches how to read those drivers inside the mosaic."
+              />
               <h2 className="text-xl font-semibold text-slate-900">Investment thesis</h2>
               <p className="mt-3 text-base leading-relaxed text-slate-700">{report.investment_thesis.summary}</p>
+              {report.investment_thesis.key_drivers.length > 0 && (
+                <ul className="mt-4 space-y-2 border-t border-slate-100 pt-4 text-sm text-slate-700">
+                  {report.investment_thesis.key_drivers.map((d) => (
+                    <li key={d} className="flex gap-2">
+                      <span className="text-slate-400" aria-hidden>
+                        ▸
+                      </span>
+                      <span>{d}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {report.ai_narratives?.thesis_expansion ? (
+                <AiGenerationBlock
+                  modelLabel={report.ai_narratives.model_used}
+                  heading="LLM expands how this mosaic fits together (education)."
+                >
+                  {report.ai_narratives.thesis_expansion}
+                </AiGenerationBlock>
+              ) : null}
             </Card>
+
+            {report.scoring_engine && (
+              <Card className="border-indigo-200 bg-indigo-50/30">
+                <h2 className="text-xl font-semibold text-slate-900">Dimensional signal breakdown</h2>
+                <p className="mt-1 text-sm text-slate-600">
+                  Top positive and negative deterministic signals used to calculate each dimension score.
+                </p>
+                <div className="mt-4 grid gap-4 lg:grid-cols-3">
+                  {(
+                    [
+                      ["Fundamental", dimensionSignals.fundamental],
+                      ["Technical", dimensionSignals.technical],
+                      ["Sentiment", dimensionSignals.sentiment],
+                    ] as const
+                  ).map(([name, grp]) => (
+                    <Card key={name} className="border-slate-200 bg-white/90 p-4">
+                      <p className="text-sm font-semibold text-slate-900">{name}</p>
+                      <p className="mt-2 text-xs font-semibold uppercase text-emerald-700">Positive signals</p>
+                      <ul className="mt-1 space-y-1 text-xs text-slate-700">
+                        {grp.pos.length > 0 ? grp.pos.map((s) => (
+                          <li key={`${name}-pos-${s.name}`}>+{s.points}: {s.reason}</li>
+                        )) : <li>None</li>}
+                      </ul>
+                      <p className="mt-3 text-xs font-semibold uppercase text-rose-700">Negative signals</p>
+                      <ul className="mt-1 space-y-1 text-xs text-slate-700">
+                        {grp.neg.length > 0 ? grp.neg.map((s) => (
+                          <li key={`${name}-neg-${s.name}`}>{s.points}: {s.reason}</li>
+                        )) : <li>None</li>}
+                      </ul>
+                    </Card>
+                  ))}
+                </div>
+              </Card>
+            )}
 
             {/* Three pillars */}
             <div className="grid gap-6 lg:grid-cols-3">
               <Card>
+                <ProvenanceAside
+                  tag="pillar · fundamentals"
+                  detail="Growth, leverage, profitability, and valuation knobs from Layer1 snapshots — scored deterministically."
+                />
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                   Fundamentals ({report.fundamental_analysis.weight}%)
                 </h3>
@@ -345,13 +611,25 @@ export function BuySellReportView() {
                 </p>
                 <dl className="mt-4 space-y-2 border-t border-slate-100 pt-4 text-xs text-slate-500">
                   <div className="flex justify-between gap-2">
-                    <dt>P/E</dt>
+                    <dt>
+                      <Term
+                        label="P/E"
+                        fullForm="Price-to-Earnings Ratio"
+                        definition="How much investors are paying for each one dollar of annual earnings."
+                      />
+                    </dt>
                     <dd className="tabular-nums text-slate-800">
                       {report.fundamental_analysis.valuation_analysis.pe ?? "—"}
                     </dd>
                   </div>
                   <div className="flex justify-between gap-2">
-                    <dt>DCF value</dt>
+                    <dt>
+                      <Term
+                        label="DCF value"
+                        fullForm="Discounted Cash Flow Value"
+                        definition="Estimated fair value based on projected future cash flows discounted to today."
+                      />
+                    </dt>
                     <dd className="tabular-nums text-slate-800">
                       {report.fundamental_analysis.valuation_analysis.dcf_value ?? "—"}
                     </dd>
@@ -370,9 +648,21 @@ export function BuySellReportView() {
                   </div>
                 </dl>
                 <p className="mt-3 text-xs text-slate-500">{report.fundamental_analysis.bull_bear_integration}</p>
+                {report.ai_narratives?.fundamentals_explained ? (
+                  <AiGenerationBlock
+                    modelLabel={report.ai_narratives.model_used}
+                    heading="What fundamental metrics imply here (education)."
+                  >
+                    {report.ai_narratives.fundamentals_explained}
+                  </AiGenerationBlock>
+                ) : null}
               </Card>
 
               <Card>
+                <ProvenanceAside
+                  tag="pillar · technicals"
+                  detail="Momentum and moving-average cues computed locally — independent of brokerage charting UI."
+                />
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                   Technicals ({report.technical_analysis.weight}%)
                 </h3>
@@ -381,15 +671,55 @@ export function BuySellReportView() {
                   {report.technical_analysis.trend_analysis}
                 </p>
                 <dl className="mt-4 space-y-1.5 border-t border-slate-100 pt-4 text-xs text-slate-600">
-                  <div>RSI: {report.technical_analysis.indicators.rsi ?? "—"}</div>
-                  <div>MACD: {report.technical_analysis.indicators.macd_signal || "—"}</div>
-                  <div>MA 50: {report.technical_analysis.indicators.ma_50 ?? "—"}</div>
-                  <div>MA 200: {report.technical_analysis.indicators.ma_200 ?? "—"}</div>
+                  <div>
+                    <Term
+                      label="RSI"
+                      fullForm="Relative Strength Index"
+                      definition="Momentum indicator from 0 to 100; higher values mean stronger recent buying pressure."
+                    />
+                    : {report.technical_analysis.indicators.rsi ?? "—"}
+                  </div>
+                  <div>
+                    <Term
+                      label="MACD"
+                      fullForm="Moving Average Convergence Divergence"
+                      definition="Trend and momentum indicator comparing fast and slow moving averages."
+                    />
+                    : {report.technical_analysis.indicators.macd_signal || "—"}
+                  </div>
+                  <div>
+                    <Term
+                      label="MA 50"
+                      fullForm="50-day Moving Average"
+                      definition="Average closing price over the last 50 trading days."
+                    />
+                    : {report.technical_analysis.indicators.ma_50 ?? "—"}
+                  </div>
+                  <div>
+                    <Term
+                      label="MA 200"
+                      fullForm="200-day Moving Average"
+                      definition="Average closing price over the last 200 trading days, often used for long-term trend."
+                    />
+                    : {report.technical_analysis.indicators.ma_200 ?? "—"}
+                  </div>
                   <div>Price vs MA: {report.technical_analysis.indicators.price_vs_ma || "—"}</div>
                 </dl>
+                {report.ai_narratives?.technical_explained ? (
+                  <AiGenerationBlock
+                    modelLabel={report.ai_narratives.model_used}
+                    heading="Technical indicators unpacked (education)."
+                  >
+                    {report.ai_narratives.technical_explained}
+                  </AiGenerationBlock>
+                ) : null}
               </Card>
 
               <Card>
+                <ProvenanceAside
+                  tag="pillar · sentiment"
+                  detail="Titles pulled from headline feeds plus FinBERT/keyword tagging when configured — complements but does not override fundamentals/technicals."
+                />
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                   Sentiment ({report.sentiment_analysis.weight}%)
                 </h3>
@@ -401,11 +731,23 @@ export function BuySellReportView() {
                     </li>
                   ))}
                 </ul>
+                {report.ai_narratives?.sentiment_explained ? (
+                  <AiGenerationBlock
+                    modelLabel={report.ai_narratives.model_used}
+                    heading="How to read headline sentiment stacks (education)."
+                  >
+                    {report.ai_narratives.sentiment_explained}
+                  </AiGenerationBlock>
+                ) : null}
               </Card>
             </div>
 
             {/* Final synthesis */}
             <Card className="border-slate-200 bg-white shadow-sm">
+              <ProvenanceAside
+                tag="synthesis · core"
+                detail="Weighted rule blend produces the headline rating; conflicts string lists dispersion / data gaps surfaced by deterministic heuristics."
+              />
               <h2 className="text-xl font-semibold text-slate-900">Final synthesis</h2>
               <div className="mt-4 max-w-xl">{scoreBar("Overall score", report.final_verdict.overall_score)}</div>
               <p className="mt-5 text-base leading-relaxed text-slate-700">
@@ -414,10 +756,49 @@ export function BuySellReportView() {
               <p className="mt-3 text-sm font-medium text-amber-800">
                 Conflicts: {report.final_verdict.conflicts}
               </p>
+              {report.ai_narratives?.final_synthesis_ai ? (
+                <AiGenerationBlock
+                  modelLabel={report.ai_narratives.model_used}
+                  heading="Deeper mosaic view from the structured LLM pass (education)."
+                >
+                  {report.ai_narratives.final_synthesis_ai}
+                </AiGenerationBlock>
+              ) : null}
             </Card>
+
+            {report.agent_pipeline?.critic && (
+              <Card className="border-amber-200 bg-amber-50/40">
+                <ProvenanceAside
+                  tag="conflicts · quality"
+                  detail="Planner critic + rule-based dispersion checks validate evidence completeness — advisory only and separate from BUY/HOLD/SELL math."
+                />
+                <h2 className="text-xl font-semibold text-slate-900">Conflict & quality checks</h2>
+                <p className="mt-2 text-sm text-slate-700">
+                  Critic status: {report.agent_pipeline.critic.passed ? "passed" : "review recommended"}.
+                </p>
+                {report.agent_pipeline.critic.flags.length > 0 && (
+                  <ul className="mt-3 list-inside list-disc text-sm text-amber-900">
+                    {report.agent_pipeline.critic.flags.map((f) => (
+                      <li key={`flag-${f}`}>{f}</li>
+                    ))}
+                  </ul>
+                )}
+                {report.agent_pipeline.critic.notes.length > 0 && (
+                  <ul className="mt-2 list-inside list-disc text-sm text-slate-700">
+                    {report.agent_pipeline.critic.notes.map((n) => (
+                      <li key={`note-${n}`}>{n}</li>
+                    ))}
+                  </ul>
+                )}
+              </Card>
+            )}
 
             {report.llm_review && (
               <Card className="border-violet-200 bg-violet-50/50">
+                <ProvenanceAside
+                  tag="AI explanation"
+                  detail="Standalone prose pass that narrates deterministic scores (FinBERT labeling path when selected vs generative backends). Separate from the blue structured narrative blocks; both obey the educational safety charter."
+                />
                 <h2 className="text-xl font-semibold text-slate-900">AI explanation</h2>
                 <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
                   <Badge label={`Requested model: ${llmChoice}`} variant="neutral" />
@@ -430,8 +811,11 @@ export function BuySellReportView() {
                     variant={report.llm_review.model && report.llm_review.model !== "none" ? "positive" : "neutral"}
                   />
                 </div>
-                <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-slate-700">
+                <div className="mt-2 whitespace-pre-wrap text-sm italic leading-relaxed text-blue-900">
                   {report.llm_review.rationale}
+                </div>
+                <p className="mt-1 text-[11px] text-blue-800/90">
+                  Styled in blue italic to match other generative narration in this workspace.
                 </p>
                 {report.llm_review.model === "none" && (
                   <p className="mt-2 text-xs text-amber-700">
@@ -444,6 +828,10 @@ export function BuySellReportView() {
 
             {/* Risk & actions */}
             <Card>
+              <ProvenanceAside
+                tag="risk · scaffolding"
+                detail="Starter risk bullets + playbook language come from deterministic templates for every run."
+              />
               <h2 className="text-xl font-semibold text-slate-900">Risk assessment</h2>
               <div className="mt-6 grid gap-4 md:grid-cols-2">
                 <Card className="border-slate-200 bg-slate-50/80 p-4">
@@ -457,10 +845,27 @@ export function BuySellReportView() {
                   </p>
                 </Card>
               </div>
+              {report.ai_narratives?.risk_commentary_ai ? (
+                <AiGenerationBlock
+                  modelLabel={report.ai_narratives.model_used}
+                  heading="Scenario commentary from the structured narrative pass."
+                >
+                  {report.ai_narratives.risk_commentary_ai}
+                </AiGenerationBlock>
+              ) : includeLlmReview ? (
+                <p className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                  Structured narrative risk commentary was not returned (provider disabled or token missing). Try another
+                  model or check server logs — deterministic checklist above still applies.
+                </p>
+              ) : null}
             </Card>
 
             {/* Citations */}
             <Card>
+              <ProvenanceAside
+                tag="citations"
+                detail="Structured provenance IDs for Layer1 plus optional Hybrid RAG chunk ids when retrieval is toggled."
+              />
               <h2 className="text-xl font-semibold text-slate-900">Citations</h2>
               <p className="mt-1 text-sm text-slate-500">
                 {includeRetrieval
@@ -535,6 +940,10 @@ export function BuySellReportView() {
 
             {report.memory && (
               <Card className="border-sky-200 bg-sky-50/50">
+                <ProvenanceAside
+                  tag="session memory · phase 7"
+                  detail="Hydrated after analyze for continuity — not fused into deterministic weights."
+                />
                 <h2 className="text-xl font-semibold text-slate-900">
                   Session memory <span className="text-xs font-normal text-sky-700">(Phase 7)</span>
                 </h2>
@@ -555,6 +964,10 @@ export function BuySellReportView() {
 
             {report.agent_pipeline && (
               <Card className="border-violet-200 bg-violet-50/40">
+                <ProvenanceAside
+                  tag="agent pipeline · phase 6"
+                  detail="Operational trace tying Layer1 ingestion, retrieval toggles, and scoring steps together for auditability."
+                />
                 <h2 className="text-xl font-semibold text-slate-900">
                   Agent pipeline <span className="text-xs font-normal text-violet-700">(Phase 6)</span>
                 </h2>

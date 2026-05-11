@@ -2,15 +2,15 @@
 
 **See also:** Per-phase implementation status (done vs. not done): [`docs/phases/buy-sell-implementation-status.md`](phases/buy-sell-implementation-status.md).
 
-Citation-grounded **AI Equity Research Assistant** for buy/sell analysis. The **Kavout-style report** is the **output contract**; the **agentic + RAG + tools** stack sits behind it.
+Citation-grounded **AI Equity Research Assistant** for buy/sell analysis. The **structured Buy/Sell report** is the **output contract**; the **agentic + RAG + tools** stack sits behind it.
 
 ---
 
 ## Principles
 
 1. **Start from the output format, not the model** — define the JSON/report schema before agents or prompts.
-2. **Do not** imitate Kavout with a single prompt — the rubric expects evaluation, agents, RAG, memory, and multi-model comparison.
-3. **Winning combo:** Kavout-like report on the front end, grounded multi-agent system on the back end.
+2. **Do not** collapse the product into a single generic prompt — the rubric expects evaluation, agents, RAG, memory, and multi-model comparison.
+3. **Winning combo:** Rich report UI on the front end, grounded multi-agent system on the back end.
 
 ---
 
@@ -53,7 +53,7 @@ Lock the API/UI contract. Example structure (adjust field names in one place as 
 | **Layer 1 — Data pipeline** | Structured fetches: prices, indicators, fundamentals, news, optional filings/transcripts. |
 | **Layer 2 — Retrieval (RAG)** | Hybrid search (vector + keyword/BM25), metadata (`ticker`, `date`, `source`, `section`, doc type). |
 | **Layer 3 — Multi-agent reasoning** | Planner → Executor → Critic (tools + verification). |
-| **Layer 4 — Report generator** | Kavout-style JSON + narrative + citations. |
+| **Layer 4 — Report generator** | Structured JSON + narrative + citations. |
 
 ---
 
@@ -267,7 +267,7 @@ frontend/
 
 1. **Freeze** output schema (JSON + TypeScript types if applicable).
 2. **One endpoint:** `analyze_stock(ticker, horizon="6-12 months")` returning the structure above (mock tools allowed for 24h).
-3. **One Kavout-style** report page/card in the UI.
+3. **One structured** Buy/Sell report page/card in the UI.
 4. **Rule-based** `overall_score` + BUY/HOLD/SELL bands.
 5. **LLM** fills narrative sections from structured inputs; **citations** array from sources you control.
 6. **Test** on 5 stocks manually.
@@ -288,4 +288,4 @@ frontend/
 
 ---
 
-*Document version: 1.0 — aligns with Kavout-style output template + CMPE-258-style requirements (agents, RAG, memory, evaluation, multi-model).*
+*Document version: 1.0 — aligns with the structured Buy/Sell output template + CMPE-258-style requirements (agents, RAG, memory, evaluation, multi-model).*

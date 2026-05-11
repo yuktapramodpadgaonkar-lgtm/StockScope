@@ -30,6 +30,7 @@ frontend/tsconfig.tsbuildinfo
 
 # Local API persistence (user-specific; recreated by backend)
 backend/data/history_store.json
+backend/data/history_*.json
 
 # Local audit / batch eval outputs (may contain prompt snippets)
 backend/logs/*.jsonl

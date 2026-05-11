@@ -334,7 +334,7 @@ def handle_chat_query(
             planner_retry_hint=planner_hint,
             user_memory_summary=mem_ctx,
         )
-        plan_result = _llm.generate_response(plan_prompt, preferred_model=model_name or "gemini")
+        plan_result = _llm.generate_response(plan_prompt, preferred_model=model_name or settings.default_llm_provider)
         log_model_call(
             provider=plan_result.provider or "none",
             model=plan_result.model_used or "none",
@@ -426,7 +426,7 @@ def handle_chat_query(
         citations=citations_json,
         user_memory_summary=mem_ctx,
     )
-    write_res = _llm.generate_response(writer_prompt, preferred_model=model_name or "gemini")
+    write_res = _llm.generate_response(writer_prompt, preferred_model=model_name or settings.default_llm_provider)
     log_model_call(
         provider=write_res.provider or "none",
         model=write_res.model_used or "none",
@@ -466,7 +466,7 @@ def handle_chat_query(
             critic_notes=notes,
             user_memory_summary=mem_ctx,
         )
-        rep = _llm.generate_response(repair_prompt, preferred_model=model_name or "gemini")
+        rep = _llm.generate_response(repair_prompt, preferred_model=model_name or settings.default_llm_provider)
         log_model_call(
             provider=rep.provider or "none",
             model=rep.model_used or "none",

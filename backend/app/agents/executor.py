@@ -80,7 +80,7 @@ def execute_buy_sell_pipeline(
     retrieval_top_k: int,
     retrieval_max_age_days: int | None,
     retrieval_query: str | None = None,
-    preferred_model: str = "gemini",
+    preferred_model: str = "hf_qwen",
 ) -> ExecutionResult:
     """
     Run Layer1 → optional RAG → report. Records per-step timing for the agent trace.
@@ -100,6 +100,9 @@ def execute_buy_sell_pipeline(
             period=period,
             interval=interval,
             news_limit=news_limit,
+            include_filings=include_retrieval,
+            include_news_enrichment=include_retrieval,
+            include_analyst_enrichment=include_retrieval,
         ),
     )
     trace.append(st)

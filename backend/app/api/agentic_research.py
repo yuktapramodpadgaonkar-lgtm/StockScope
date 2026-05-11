@@ -42,7 +42,7 @@ class AgenticResearchRequest(BaseModel):
     ticker: str = Field(..., min_length=1, max_length=16)
     question: str = Field(..., min_length=1, max_length=2000)
     session_id: str = Field(default="default", min_length=1, max_length=64)
-    preferred_model: str = Field(default="gemini", description="gemini | llama | mistral")
+    preferred_model: str = Field(default="llama", description="gemini | llama | mistral")
     max_steps: int = Field(default=3, ge=2, le=4)
     include_buy_sell: bool = Field(default=True)
     include_news: bool = Field(default=True)

@@ -3,7 +3,13 @@
 import { getAccessToken } from "@/lib/auth";
 
 export type Recommendation = "BUY" | "HOLD" | "SELL";
-export type BuySellModelChoice = "gemini" | "llama" | "mistral";
+export type BuySellModelChoice =
+  | "hf_qwen"
+  | "hf_mistral_instruct"
+  | "finbert"
+  | "gemini"
+  | "llama"
+  | "mistral";
 
 export type CitationItem = {
   id: string;
@@ -55,6 +61,32 @@ export type LlmReviewBlock = {
   enabled: boolean;
   model: string;
   rationale: string;
+  warnings?: string[];
+  citations_used?: string[];
+};
+
+export type BuySellAiNarratives = {
+  thesis_expansion: string;
+  fundamentals_explained: string;
+  technical_explained: string;
+  sentiment_explained: string;
+  final_synthesis_ai: string;
+  risk_commentary_ai: string;
+  model_used: string;
+};
+
+export type ScoreSignal = {
+  name: string;
+  value: number | string | null;
+  points: number;
+  reason: string;
+};
+
+export type DimensionRuleScore = {
+  score: number;
+  max_score: number;
+  signals: ScoreSignal[];
+  data_completeness: number;
 };
 
 export type BuySellReport = {
@@ -111,10 +143,32 @@ export type BuySellReport = {
   };
   citations: CitationItem[];
   llm_review?: LlmReviewBlock | null;
+  scoring_engine?: {
+    version: string;
+    weights: {
+      fundamental: number;
+      technical: number;
+      sentiment: number;
+    };
+    rule_scores: {
+      fundamental: DimensionRuleScore;
+      technical: DimensionRuleScore;
+      sentiment: DimensionRuleScore;
+    };
+    overall: {
+      weighted_score: number;
+      recommendation: Recommendation;
+      band: string;
+      confidence: number;
+      setup_quality: number;
+    };
+  };
   /** Phase 6 — present on `/api/buy-sell/analyze` when `use_agent_pipeline=true` (default). */
   agent_pipeline?: AgentPipelineBlock | null;
   /** Phase 7 — present when `use_memory=true` (default) and memory is enabled on the server. */
   memory?: MemoryBlock | null;
+  /** v1.3.0+ — Multi-section prose from one structured LLM call (education only). */
+  ai_narratives?: BuySellAiNarratives | null;
 };
 
 export type BuySellRequestOptions = {
@@ -149,7 +203,7 @@ export async function fetchBuySellReport(
   const includeLlmReview = options.includeLlmReview ?? false;
   const includeRetrieval = options.includeRetrieval ?? false;
   const useAgentPipeline = options.useAgentPipeline ?? true;
-  const preferredModel = options.preferredModel ?? "gemini";
+  const preferredModel = options.preferredModel ?? "hf_qwen";
   const url =
     `${getApiBase()}/api/buy-sell/analyze/${encodeURIComponent(sym)}` +
     `?include_llm_review=${includeLlmReview}` +

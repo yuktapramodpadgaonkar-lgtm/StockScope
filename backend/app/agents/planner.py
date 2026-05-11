@@ -57,7 +57,7 @@ def plan_buy_sell_analysis(
     steps.append(
         PlannedStep(
             "score_and_report",
-            "Deterministic rule scores + Kavout-style report assembly"
+            "Deterministic rule scores + structured Buy/Sell report assembly"
             + (" + advisory LLM review" if include_llm_review else ""),
         )
     )

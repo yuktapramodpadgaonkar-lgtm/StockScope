@@ -455,26 +455,25 @@ def build_agentic_chat_repair_prompt(
 
 BUY_SELL_EXPLANATION_PROMPT = """\
 {safety}
-{few_shot_examples}
-You are an educational financial analyst explaining a deterministic scoring model's output.
+You are an educational financial analyst explaining a deterministic scoring output.
 
 Ticker: {ticker}
-Deterministic Recommendation: {recommendation}
-Overall Score: {overall_score}/100
-
-Dimension Scores (rule-based, not your opinion):
-- Fundamental: {fundamental_score}/100
-- Technical:   {technical_score}/100
-- Sentiment:   {sentiment_score}/100
+Recommendation: {recommendation}
+Overall: {overall_score}/100
+Fundamental: {fundamental_score}/100, Technical: {technical_score}/100, Sentiment: {sentiment_score}/100
 
 Key signals from the data:
 {signals}
 
+Finance fields snapshot:
+{finance_facts}
+
 Instructions:
-1. In 3-4 sentences, explain in plain English what drove this deterministic score.
-2. Reference ONLY the signals listed above — do NOT invent new data.
-3. Do NOT make an independent buy/sell recommendation — just explain the model's output.
-4. End with: "This is for educational purposes only and is not financial advice."
+1. Write a concise explanation of what drove the score (professional equity-research tone).
+2. Use ONLY the signals listed above. Do not invent data.
+3. Include a short section "Potential contradictions / failure risks:" with 2-4 bullets on conditions that could make the rating wrong.
+4. Do not make a new recommendation; only explain the given output.
+5. End with: "This is for educational purposes only and is not financial advice."
 
 Return ONLY plain text (no JSON, no markdown fences).
 """
@@ -488,11 +487,33 @@ def build_buy_sell_explanation_prompt(
     technical_score: int,
     sentiment_score: int,
     signals: list[str],
+    finance_facts: list[str] | None = None,
+    fast_mode: bool = False,
 ) -> str:
-    signals_text = "\n".join(f"- {s}" for s in signals) if signals else "- No specific signals available."
-    return BUY_SELL_EXPLANATION_PROMPT.format(
+    compact = [s.strip()[:140] for s in signals if str(s).strip()]
+    compact = compact[: (2 if fast_mode else 4)]
+    signals_text = "\n".join(f"- {s}" for s in compact) if compact else "- No specific signals available."
+    fin = [x.strip()[:160] for x in (finance_facts or []) if str(x).strip()]
+    fin = fin[:8]
+    finance_text = "\n".join(f"- {x}" for x in fin) if fin else "- Limited finance fields were available."
+    prompt = BUY_SELL_EXPLANATION_PROMPT
+    if fast_mode:
+        prompt = """\
+{safety}
+Explain this deterministic stock score in exactly 2 short sentences.
+Ticker: {ticker}
+Recommendation: {recommendation}
+Overall: {overall_score}/100
+Fundamental: {fundamental_score}/100, Technical: {technical_score}/100, Sentiment: {sentiment_score}/100
+Signals:
+{signals}
+Finance fields:
+{finance_facts}
+Rules: use only listed signals/finance fields; add 2 bullets under "Potential contradictions / failure risks:"; no new recommendation; end with: "This is for educational purposes only and is not financial advice."
+Return plain text only.
+"""
+    return prompt.format(
         safety=SAFETY_BLOCK,
-        few_shot_examples=_few_shots("buy_sell"),
         ticker=ticker.upper(),
         recommendation=recommendation,
         overall_score=overall_score,
@@ -500,6 +521,42 @@ def build_buy_sell_explanation_prompt(
         technical_score=technical_score,
         sentiment_score=sentiment_score,
         signals=signals_text,
+        finance_facts=finance_text,
+    )
+
+
+BUY_SELL_STRUCTURED_NARRATIVE_JSON_PROMPT = """\
+{safety}
+You are drafting SUPPLEMENTARY educational commentary for an existing multi-section Buy/Sell analysis report.
+The report already has deterministic scores — you must NOT overturn them.
+
+Context (JSON summarizing deterministic output + sampled raw fields — use only numbers and facts shown):
+{report_context}
+
+Produce exactly ONE JSON object with these STRING keys only (ASCII double quotes):
+- "thesis_expansion": 2–4 sentences expanding the thesis in plain English (no new “Buy/Sell” commands).
+- "fundamentals_explained": 3–6 sentences explaining what fundamentals in the snapshot imply and what metrics
+  like growth, margins, valuation ratios, and upside proxies generally mean here.
+- "technical_explained": 3–6 sentences explaining what RSI, MACD, moving-average structure and trend cues
+  mean in general and how they relate to the numbers in context.
+- "sentiment_explained": 2–5 sentences explaining how headline/sample sentiment feeds are typically read,
+  uncertainty when coverage is thin, and how sentiment ties to (but does not replace) fundamentals/technicals.
+- "final_synthesis_ai": 5–10 sentences weaving fundamentals, technicals, sentiment, and confidence/conflicts —
+  richer than a one-line summary; call out tensions if scores disagree.
+- "risk_commentary_ai": 3–8 sentences deepening the risk/action themes with scenario thinking (rates, breadth,
+  data gaps); educational tone only.
+
+Hard rules:
+- Return ONLY valid JSON (no markdown fences, no prose outside the JSON).
+- Do NOT invent ticker-specific facts, prices, broker names, or numbers not hinted in context.
+- If context is sparse, say so inside the strings and stay generic.
+"""
+
+
+def build_buy_sell_structured_narrative_json_prompt(report_context_json: str) -> str:
+    return BUY_SELL_STRUCTURED_NARRATIVE_JSON_PROMPT.format(
+        safety=SAFETY_BLOCK,
+        report_context=report_context_json,
     )
 
 

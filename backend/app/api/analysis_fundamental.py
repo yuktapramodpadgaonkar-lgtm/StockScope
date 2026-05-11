@@ -149,7 +149,7 @@ def get_fundamental_analysis(
         description="If true, request an optional AI explanation (best-effort).",
     ),
     preferred_model: str = Query(
-        "gemini",
+        "llama",
         description="Preferred LLM: gemini | llama | mistral (auto-fallback applies).",
     ),
     include_rag: bool = Query(
