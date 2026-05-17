@@ -97,6 +97,9 @@ def main() -> int:
             "safety_total": 0,
             "citations": [],
             "judge_scores": [],
+            "judge_clarity": [],
+            "judge_correctness": [],
+            "judge_grounding": [],
             "errors": 0,
         }
         for m in models
@@ -125,6 +128,7 @@ def main() -> int:
 
             judge_score = None
             judge_reason = None
+            judge_detail = None
             if args.judge and res.response and not res.error:
                 from score_outputs import _llm_judge  # noqa: PLC0415
 
@@ -133,10 +137,23 @@ def main() -> int:
                     response_text=res.response,
                     model_label=mname,
                 )
-                judge_score = j.get("score")
+                judge_detail = j
+                # Prefer judge_score (mean of subscores), fallback to legacy score.
+                judge_score = j.get("judge_score")
+                if not isinstance(judge_score, (int, float)):
+                    judge_score = j.get("score")
                 judge_reason = j.get("reason")
-                if isinstance(judge_score, int):
-                    st["judge_scores"].append(judge_score)
+
+                if isinstance(judge_score, (int, float)):
+                    st["judge_scores"].append(float(judge_score))
+                for key, bucket in (
+                    ("clarity", "judge_clarity"),
+                    ("correctness", "judge_correctness"),
+                    ("grounding", "judge_grounding"),
+                ):
+                    v = j.get(key)
+                    if isinstance(v, (int, float)):
+                        st[bucket].append(float(v))
 
             detail.append(
                 {
@@ -151,6 +168,7 @@ def main() -> int:
                     "metrics": res.metrics,
                     "judge_score": judge_score,
                     "judge_reason": judge_reason,
+                    "judge_detail": judge_detail,
                 }
             )
 
@@ -163,6 +181,12 @@ def main() -> int:
         avg_cit = sum(st["citations"]) / len(st["citations"]) if st["citations"] else 0.0
         jscores = st["judge_scores"]
         avg_j = sum(jscores) / len(jscores) if jscores else None
+        jclar = st["judge_clarity"]
+        jcorr = st["judge_correctness"]
+        jgnd = st["judge_grounding"]
+        avg_jclar = sum(jclar) / len(jclar) if jclar else None
+        avg_jcorr = sum(jcorr) / len(jcorr) if jcorr else None
+        avg_jgnd = sum(jgnd) / len(jgnd) if jgnd else None
         err_note = f"{st['errors']} run errors" if st["errors"] else ""
         rows.append(
             {
@@ -171,6 +195,9 @@ def main() -> int:
                 "safety_pass_pct": safety_pct,
                 "avg_citations": round(avg_cit, 2),
                 "avg_judge_1_to_5": round(avg_j, 2) if avg_j is not None else None,
+                "avg_judge_clarity": round(avg_jclar, 2) if avg_jclar is not None else None,
+                "avg_judge_correctness": round(avg_jcorr, 2) if avg_jcorr is not None else None,
+                "avg_judge_grounding": round(avg_jgnd, 2) if avg_jgnd is not None else None,
                 "notes": err_note,
             }
         )

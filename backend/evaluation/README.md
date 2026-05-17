@@ -1,6 +1,6 @@
 # Evaluation (Phase 8 + rubric harness)
 
-- **`eval_set.json`** — **89** structured cases (`id`, `category`, `input`, `expected_behavior`, `checks`, `models_to_run`, `cost`, optional `score_checks`, `score_meta`). Categories include fundamental, buy_sell, news_sentiment, chatbot, market_movers, safety_refusal, auth_protected_routes, citation_grounding, memory_history, multi_model_comparison, **agentic_chat** (`rub-084`–`rub-086`), and **agentic_rag** (`rub-061`–`rub-075`). Buy/sell rows that set `"runner": "buy_sell_orchestrator"` are consumed by `run_eval.py`.
+- **`eval_set.json`** — **106** structured cases (`id`, `category`, `input`, `expected_behavior`, `checks`, `models_to_run`, `cost`, optional `score_checks`, `score_meta`). **fundamental**, **news_sentiment**, **buy_sell**, and **agentic_rag** each have **10** rows; **market_movers** has **20**. Other categories include chatbot, safety_refusal, auth_protected_routes, citation_grounding, memory_history, multi_model_comparison, **agentic_chat** (`rub-084`–`rub-086`), and **agentic_rag** (`rub-061`–`rub-070` in the current set). Buy/sell rows that set `"runner": "buy_sell_orchestrator"` are consumed by `run_eval.py`.
 - **`few_shot_examples.json`** — Index pointing at **`few_shot/*.json`** (one file per feature: buy/sell, fundamental, news themes, chat, multi-model, agentic chat, agentic RAG). Loaded at runtime by `services/ai/few_shot_loader.py` and prepended into the matching LLM prompts.
 - **`run_eval.py`** — In-process harness: runs **buy/sell orchestrator** cases from `eval_set.json` only (use `--inline`). Writes `data/eval/last_eval_run.json` by default.
 - **`run_batch_eval.py`** — Rubric batch scaffold: static HTTP checks (e.g. 401 on unauthenticated fundamentals), unit-style checks (intent, safety regex, citation helper), and optional live modes (`--live-fundamental`, `--live-news`, `--live-market-data`, `--live-orchestrator`, `--live-multi`). Writes JSON + CSV under `backend/evaluation/results/` (gitignored).
@@ -74,6 +74,13 @@ python backend/evaluation/run_capture_and_score.py --subset full --judge
 
 # Only save outputs (no Gemini judge / no rule pass summary)
 python backend/evaluation/run_capture_and_score.py --subset full --capture-only
+```
+
+**Four features × multi-model metrics** — same compare-models prompt template for **buy_sell**, **fundamental**, **news_sentiment**, and **agentic_rag** (default **10** cases per category from `eval_set.json`). Produces `captured_*`, `scoring_*`, then aggregate CSV via `export_metrics_csv.py` (latency, safety %, citations, grounding, completeness, hallucination rate, optional judge clarity/correctness/grounding/avg):
+
+```bash
+python backend/evaluation/run_feature_multimodel_eval.py --judge
+python backend/evaluation/export_metrics_csv.py --stamp <STAMP>
 ```
 
 Re-score an existing capture without re-running models:

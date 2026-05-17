@@ -60,6 +60,7 @@ def _llm_judge(
     model_label: str,
 ) -> dict:
     _ensure_path()
+    from app.core.config import settings
     from app.services.ai.llm_client import generate_text
 
     prompt = f"""You are grading a stock research assistant answer for a class project.
@@ -88,7 +89,12 @@ reason (short string under 200 chars)
 
 Also include judge_score (number): the mean of clarity, correctness, grounding, rounded to one decimal.
 """
-    out = generate_text(prompt, provider="gemini", model="gemini-1.5-flash")
+    # Use configured Gemini model (from backend/.env) to avoid stale hardcoding.
+    model = (getattr(settings, "gemini_model", "") or "gemini-flash-lite-latest").strip()
+    # Some listModels entries include the "models/" prefix; llm_client expects the raw id.
+    if model.startswith("models/"):
+        model = model.split("/", 1)[1]
+    out = generate_text(prompt, provider="gemini", model=model)
     if out.get("error") or not out.get("text"):
         return {
             "score": None,

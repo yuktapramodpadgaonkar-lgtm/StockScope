@@ -12,6 +12,7 @@ numpy
 eval_type_backport  # Python 3.9 + Pydantic v2 compatibility for X|None syntax
 pytest
 respx              # httpx mock transport for integration tests
+matplotlib         # evaluation bar charts (plot_model_metrics_bars.py)
 # ── Auth ──────────────────────────────────────────────────────────────────────
 python-jose[cryptography]  # JWT signing / verification
 passlib[bcrypt]            # password hashing
