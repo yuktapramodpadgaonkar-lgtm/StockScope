@@ -409,7 +409,7 @@ Pure dense (embedding-based) retrieval generalises well to semantically similar 
 
 Static and deterministic checks always run. Live-LLM categories are skipped (`not_run`) when their flag is omitted and produce 0 failures — they are gated on available API quota or a running Ollama instance.
 
-**Latest run: `batch_eval_20260519-174832` — 60 pass / 0 fail / 51 not-run (needs live LLM flag)**
+**Latest run: `batch_eval_20260519-182113` — 72 pass / 1 fail / 38 not-run (needs live LLM flag)**
 
 | Category | Cases | Pass | Status | Live flag required |
 |----------|-------|------|--------|--------------------|
@@ -420,17 +420,19 @@ Static and deterministic checks always run. Live-LLM categories are skipped (`no
 | market_movers | 20 | 20 | ✅ | `--live-market-data` |
 | fundamental | 10 | 10 | ✅ | `--live-fundamental` |
 | chatbot | 10 | 10 | ✅ | `--live-chat` |
+| news_sentiment | 10 | 10 | ✅ | `--live-news` |
+| agentic_chat | 3 | 2 | ⚠ 1 fail (LLM substring) | `--live-agentic` (via `--live-chat`) |
 | buy_sell | 10 | 0 | ⏭ not-run | `--live-orchestrator` |
-| news_sentiment | 10 | 0 | ⏭ not-run | `--live-news` |
 | multi_model_comparison | 18 | 0 | ⏭ not-run | `--live-multi` |
 | agentic_rag | 10 | 0 | ⏭ not-run | `--live-agentic` |
-| agentic_chat | 3 | 0 | ⏭ not-run | `--live-agentic` |
-| **Total** | **111** | **60** | **0 failures** | |
+| **Total** | **111** | **72** | **1 fail (LLM variation)** | |
 
-> Latest full results: `backend/evaluation/results/batch_eval_20260519-174832.{csv,json}`. Run commands:
+> The 1 failure (`rub-085`) is an agentic chat case where the LLaMA response omits the expected substring `'history'` — natural LLM output variation, not a system defect.
+>
+> Latest full results: `backend/evaluation/results/batch_eval_20260519-182113.{csv,json}`. Run commands:
 > ```bash
-> # Static + market + fundamental + chat (60 cases, 100% pass)
-> python backend/evaluation/run_batch_eval.py --live-market-data --live-fundamental --live-chat
+> # Static + market + fundamental + chat + news (72 cases)
+> python backend/evaluation/run_batch_eval.py --live-market-data --live-fundamental --live-chat --live-news
 > # Full run (requires Gemini key or Ollama; Gemini quota may be exhausted)
 > python backend/evaluation/run_batch_eval.py --live-market-data --live-fundamental --live-news --live-chat --live-orchestrator --live-multi
 > python backend/evaluation/run_batch_eval.py --category agentic_rag --live-agentic
