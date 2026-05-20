@@ -79,7 +79,7 @@ Fallback order (per request): Gemini → LLaMA → Mistral. All LLM calls are ha
 - Frontend: `/evaluation` — dropdown task selector, ticker input, side-by-side results table
 
 ### 7. Evaluation rubric harness
-- **`backend/evaluation/eval_set.json`** — **91** cases (fundamental, buy/sell, news, chat, market movers, safety, auth, citations, memory, multi-model incl. `rub-087`–`rub-089`, **agentic chat** `rub-084`–`rub-086`, **agentic RAG** `rub-061`–`rub-075`, **news RAG** `rub-091`, **fundamental RAG** `rub-090`)
+- **`backend/evaluation/eval_set.json`** — **111** cases (fundamental, buy/sell, news, chat, market movers, safety, auth, citations, memory, multi-model incl. `rub-087`–`rub-089`, **agentic chat** `rub-084`–`rub-086`, **agentic RAG** `rub-061`–`rub-075`, **news RAG** `rub-091`, **fundamental RAG** `rub-090`)
 - **`backend/evaluation/run_batch_eval.py`** — batch runner with optional `--live-fundamental`, `--live-news`, `--live-market-data`, `--live-orchestrator`, `--live-multi`; writes CSV/JSON under `backend/evaluation/results/` (gitignored)
 - **`backend/evaluation/run_eval.py`** — buy/sell agent pipeline smoke eval (yfinance; subsets via `--max-cases`)
 - **Structured logs** — append-only `backend/logs/model_calls.jsonl` and `backend/logs/tool_calls.jsonl` (gitignored)
@@ -281,7 +281,7 @@ Frontend (Next.js + TypeScript + Tailwind)
 
 - **Backend:** Python 3.9+, FastAPI, Pydantic v2, yfinance, httpx
 - **Frontend:** Next.js 15, React, TypeScript, Tailwind CSS
-- **LLMs:** Gemini 1.5 Flash (Google AI), LLaMA 3.1 8B + Mistral 7B (Ollama)
+- **LLMs:** Gemini 2.0 Flash (Google AI), LLaMA 3.1 8B + Mistral 7B (Ollama)
 - **Sentiment:** FinBERT via HuggingFace Inference API
 - **Storage:** JSON file store (history), in-memory cache (market movers)
 
@@ -364,3 +364,142 @@ Results written to `backend/evaluation/results/` as CSV + JSON.
 ## Disclaimer
 
 All outputs are for educational purposes only and are not financial advice. Always consult a licensed financial adviser before making investment decisions.
+
+---
+
+## System Contribution vs. Off-the-Shelf Components
+
+StockScope is a **system-level contribution**: the novelty lies in how existing components are combined and evaluated, not in any single new algorithm.
+
+### What we built (system-level)
+- A **deterministic financial scoring engine** (fundamentals 40%, technicals 30%, sentiment 30%) with per-dimension data-completeness tracking and LLM agreement overlay (`backend/app/services/buy_sell_scoring.py`).
+- An **agentic RAG pipeline** (`/api/agentic-research/run`) in which an LLM planner decomposes a free-form financial question into a 2–4 step tool plan, executes those tools, constructs a grounded evidence bundle, and passes the answer through a multi-check rule critic with one automatic repair pass. The critic checks citation index validity, ticker-in-evidence, significant numeric claims, and financial advice patterns.
+- A **hybrid retrieval layer** combining sparse BM25 and dense sentence-transformer embeddings with configurable weights, applied across four product features (buy/sell, fundamentals, news, agentic research).
+- A **structured evaluation harness** (111 rubric cases across 12 categories) with rule-based scoring, LLM-as-judge scoring via Gemini, and batch CSV export.
+- A **multi-model comparison UI** where the same prompt is submitted independently to Gemini, LLaMA, and Mistral, with latency, grounding, completeness, and safety scores reported side by side.
+
+### Off-the-shelf components we use (cited in References)
+- **FinBERT** — pre-trained financial sentiment model from ProsusAI; used as-is via HuggingFace Inference API with a keyword-heuristic fallback. No fine-tuning was performed.
+- **BM25 (Okapi BM25)** — classic sparse retrieval algorithm; implemented via a local BM25 scorer in `backend/app/rag/bm25.py`.
+- **`sentence-transformers/all-MiniLM-L6-v2`** — pre-trained dense embedding model from SBERT; used for query and chunk embedding in the RAG pipeline.
+- **Gemini 2.0 Flash** — Google's generative model accessed via REST API; used as primary LLM for generation, theme extraction, and LLM-as-judge scoring.
+- **LLaMA 3.1 8B / Mistral 7B** — open-weight models served locally via Ollama; used as fallback LLMs.
+- **yfinance** — open-source Yahoo Finance wrapper for market data, fundamentals, and historical prices.
+
+### What is *not* claimed
+- The buy/sell **planner** (`backend/app/agents/planner.py`) is a **fixed DAG**, not a free-form LLM planner. It deterministically selects steps from flags (`include_retrieval`, `include_llm_review`, `horizon`). The *agentic research* planner (`/api/agentic-research/run`) is LLM-driven.
+- **GraphRAG is not implemented.** The "advanced" retrieval claim refers to hybrid BM25+dense search and agentic tool orchestration.
+- **Memory** is a lightweight session store (recent tickers, topics, risk style) — not semantic long-term memory retrieval.
+
+---
+
+## Design Rationale
+
+### Why hybrid retrieval instead of pure dense retrieval
+
+Pure dense (embedding-based) retrieval generalises well to semantically similar queries but struggles with exact-match needs common in finance: specific ticker symbols, SEC filing numbers, exact metric names, and domain jargon that may be rare in the embedding model's pre-training corpus. BM25 handles exact and rare-term matches precisely but cannot capture paraphrase or semantic similarity. Following the finding in the literature that hybrid sparse+dense retrieval consistently outperforms either alone on domain-specific corpora ([Luan et al., 2021](#references); [Ma et al., 2021](#references)), we combine BM25 and `all-MiniLM-L6-v2` embeddings with tunable weights (`RAG_BM25_WEIGHT=0.45`, `RAG_EMBEDDING_WEIGHT=0.55`). The weights are configurable via environment variables so they can be tuned without code changes.
+
+### Why Gemini → LLaMA → Mistral fallback order
+
+**Gemini 2.0 Flash** is the primary provider because it returns structured JSON reliably, has a large context window suitable for multi-tool evidence bundles, and has the lowest observed latency for generation tasks in our evaluation. **LLaMA 3.1 8B** is first fallback: it is open-weight, runs locally via Ollama with no data egress, and produces grammatically correct structured output at a reasonable speed on consumer hardware. **Mistral 7B** is the second fallback: slightly faster than LLaMA on short prompts but produces less consistent JSON adherence in our tests, making it a safer last resort than first fallback. Running the fallback chain requires no API key rotation — the system degrades gracefully to local inference when cloud quotas are exhausted. All three models are scored independently in the model-comparison evaluation (`/evaluation` page, `backend/evaluation/run_feature_multimodel_eval.py`).
+
+---
+
+## Evaluation Summary
+
+Static and deterministic checks always run. Live-LLM categories are skipped (`not_run`) when their flag is omitted and produce 0 failures — they are gated on available API quota or a running Ollama instance.
+
+**Latest run: `batch_eval_20260519-174832` — 60 pass / 0 fail / 51 not-run (needs live LLM flag)**
+
+| Category | Cases | Pass | Status | Live flag required |
+|----------|-------|------|--------|--------------------|
+| auth_protected_routes | 5 | 5 | ✅ | — |
+| citation_grounding | 5 | 5 | ✅ | — |
+| memory_history | 4 | 4 | ✅ | — |
+| safety_refusal | 6 | 6 | ✅ | — |
+| market_movers | 20 | 20 | ✅ | `--live-market-data` |
+| fundamental | 10 | 10 | ✅ | `--live-fundamental` |
+| chatbot | 10 | 10 | ✅ | `--live-chat` |
+| buy_sell | 10 | 0 | ⏭ not-run | `--live-orchestrator` |
+| news_sentiment | 10 | 0 | ⏭ not-run | `--live-news` |
+| multi_model_comparison | 18 | 0 | ⏭ not-run | `--live-multi` |
+| agentic_rag | 10 | 0 | ⏭ not-run | `--live-agentic` |
+| agentic_chat | 3 | 0 | ⏭ not-run | `--live-agentic` |
+| **Total** | **111** | **60** | **0 failures** | |
+
+> Latest full results: `backend/evaluation/results/batch_eval_20260519-174832.{csv,json}`. Run commands:
+> ```bash
+> # Static + market + fundamental + chat (60 cases, 100% pass)
+> python backend/evaluation/run_batch_eval.py --live-market-data --live-fundamental --live-chat
+> # Full run (requires Gemini key or Ollama; Gemini quota may be exhausted)
+> python backend/evaluation/run_batch_eval.py --live-market-data --live-fundamental --live-news --live-chat --live-orchestrator --live-multi
+> python backend/evaluation/run_batch_eval.py --category agentic_rag --live-agentic
+> ```
+
+Multi-model comparison metrics (latency, grounding, completeness, hallucination rate) are generated by:
+```bash
+python backend/evaluation/run_feature_multimodel_eval.py
+python backend/evaluation/export_metrics_csv.py --stamp <stamp>
+python backend/evaluation/plot_model_metrics_bars.py --stamp <stamp>
+python backend/evaluation/plot_judge_score_grouped.py --stamp <stamp>
+python backend/evaluation/plot_latency_judge_tradeoff.py --stamp <stamp>
+```
+Outputs: `backend/evaluation/results/metrics_<stamp>.csv`, `backend/evaluation/results/figures/`.
+
+---
+
+## Code Organisation
+
+### Two LLM service files
+
+| File | Purpose |
+|------|---------|
+| `backend/services/ai/llm_service.py` | Provider-routing LLM gateway (Revati). Implements the Gemini → LLaMA → Mistral fallback chain, exposes `generate_response(prompt, preferred_model)` and per-provider methods (`generate_with_gemini`, `generate_with_ollama_llama`, `generate_with_ollama_mistral`). Used by news-sentiment, chatbot, agentic-research, evaluation, and prompts modules. |
+| `backend/app/services/ai/llm_client.py` | Provider-agnostic thin wrapper (Yukta/Ramya). Exposes `generate_text(prompt, model, provider)` used specifically by the fundamental-analysis LLM summary path and the buy/sell structured-narrative path. Deliberately kept separate to avoid coupling the scoring pipeline to the full fallback router. |
+
+Both files call the same underlying Gemini/Ollama endpoints — they are parallel implementations owned by different team members that were not merged to avoid merge conflicts during parallel development.
+
+### `backend/services/` vs `backend/app/services/`
+
+| Directory | Contains | Reason |
+|-----------|----------|--------|
+| `backend/services/` | `llm_service.py`, `news_sentiment_service.py`, `chat_service.py`, `history_service.py`, `buy_sell_llm_service.py`, `buy_sell_structured_narrative.py`, `huggingface_inference_text.py` | Revati's modules, written at the top-level `services/` path during early development. These import from `app.*` but are not themselves part of the FastAPI `app` package. |
+| `backend/app/services/` | `fundamental_service.py`, `buy_sell_scoring.py`, `market_movers_service.py`, `market_data_provider.py`, `snapshot_cache.py`, `auth_service.py`, `huggingface_llm.py` | Core application services inside the FastAPI `app` package. Owned primarily by Yukta/Ramya. These are importable as `app.services.*`. |
+
+The split is an artefact of parallel team development, not an intentional architectural boundary. A future refactor would unify both under `backend/app/services/`.
+
+---
+
+## Report Artifact Mapping
+
+The following table maps each evaluation claim in the project report to its source script, data file, and generated figure in this repository.
+
+| Report Item | Source Script | Data File | Figure/Output |
+|-------------|---------------|-----------|---------------|
+| Batch eval pass rates (all categories) | `backend/evaluation/run_batch_eval.py` | `backend/evaluation/results/batch_eval_<stamp>.csv` | — |
+| Multi-model latency comparison | `backend/evaluation/run_feature_multimodel_eval.py` + `export_metrics_csv.py` | `backend/evaluation/results/metrics_<stamp>.csv` | `figures/model_metrics_bars_<stamp>.png` |
+| Judge score by task/model | `backend/evaluation/run_feature_multimodel_eval.py --judge` + `plot_judge_score_grouped.py` | `backend/evaluation/results/metrics_<stamp>.csv` | `figures/judge_score_grouped_<stamp>.png` |
+| Latency vs. quality trade-off | `backend/evaluation/plot_latency_judge_tradeoff.py` | `backend/evaluation/results/metrics_<stamp>.csv` | `figures/latency_judge_tradeoff_<stamp>.png` |
+| Safety refusal rate | `backend/evaluation/run_batch_eval.py` | `backend/evaluation/results/batch_eval_<stamp>.csv` (category=safety_refusal) | — |
+| Agentic critic pass/fail rates | `backend/evaluation/run_batch_eval.py --category agentic_rag --live-agentic` | `backend/evaluation/results/batch_eval_<stamp>.csv` (category=agentic_rag) | — |
+| Citation grounding pass rate | `backend/evaluation/run_batch_eval.py` | `backend/evaluation/results/batch_eval_<stamp>.csv` (category=citation_grounding) | — |
+
+> All `<stamp>` values are `YYYYMMDD-HHMMSS` timestamps from the run. The most recent run files are in `backend/evaluation/results/`.
+
+---
+
+## References
+
+1. **BM25 / Okapi BM25**: Robertson, S., & Zaragoza, H. (2009). *The Probabilistic Relevance Framework: BM25 and Beyond*. Foundations and Trends in Information Retrieval, 3(4), 333–389. [doi:10.1561/1500000019](https://doi.org/10.1561/1500000019)
+
+2. **FinBERT**: Araci, D. (2019). *FinBERT: Financial Sentiment Analysis with Pre-trained Language Models*. arXiv:1908.10063. [https://arxiv.org/abs/1908.10063](https://arxiv.org/abs/1908.10063)
+
+3. **Retrieval-Augmented Generation (RAG)**: Lewis, P., Perez, E., Piktus, A., Petroni, F., Karpukhin, V., Goyal, N., … Kiela, D. (2020). *Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks*. NeurIPS 2020. [https://arxiv.org/abs/2005.11401](https://arxiv.org/abs/2005.11401)
+
+4. **Hybrid dense+sparse retrieval**: Ma, X., Lin, J., Pradeep, R., & Lin, J. (2021). *A Replication Study of Dense Passage Retrieval*. arXiv:2104.05740. [https://arxiv.org/abs/2104.05740](https://arxiv.org/abs/2104.05740) — motivates combining BM25 with dense retrieval for domain-specific corpora.
+
+5. **Sentence-Transformers / all-MiniLM-L6-v2**: Reimers, N., & Gurevych, I. (2019). *Sentence-BERT: Sentence Embeddings using Siamese BERT-Networks*. EMNLP 2019. [https://arxiv.org/abs/1908.10084](https://arxiv.org/abs/1908.10084)
+
+6. **LLM-as-a-judge**: Zheng, L., Chiang, W.-L., Sheng, Y., Zhuang, S., Wu, Z., Zhuang, Y., … Stoica, I. (2023). *Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena*. NeurIPS 2023. [https://arxiv.org/abs/2306.05685](https://arxiv.org/abs/2306.05685)
+
+7. **Agentic / critic-style evaluation**: Shinn, N., Cassano, F., Labash, B., Gopinath, A., Narasimhan, K., & Yao, S. (2023). *Reflexion: Language Agents with Verbal Reinforcement Learning*. NeurIPS 2023. [https://arxiv.org/abs/2303.11366](https://arxiv.org/abs/2303.11366) — motivates the planner–critic–repair pattern used in agentic research and chat pipelines.
