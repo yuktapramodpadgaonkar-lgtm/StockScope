@@ -1,0 +1,112 @@
+case_id,category,status,latency_ms,error,notes,cost
+rub-001,auth_protected_routes,pass,8.68,,,static
+rub-002,auth_protected_routes,pass,1.5,,,static
+rub-003,auth_protected_routes,pass,2.09,,,static
+rub-004,auth_protected_routes,pass,268.34,,,optional_live
+rub-005,auth_protected_routes,pass,3.47,,,static
+rub-006,market_movers,pass,56238.37,,,network_external
+rub-007,market_movers,pass,3.35,,,network_external
+rub-008,market_movers,pass,2.96,,,network_external
+rub-009,market_movers,pass,3.25,,,network_external
+rub-010,market_movers,pass,2.99,,,network_external
+rub-011,fundamental,pass,263.02,,,optional_live
+rub-012,fundamental,pass,254.79,,,optional_live
+rub-013,fundamental,pass,203.92,,,optional_live
+rub-014,fundamental,pass,243.06,,,optional_live
+rub-015,fundamental,pass,228.37,,,optional_live
+rub-016,fundamental,pass,226.31,,,optional_live
+rub-017,fundamental,pass,182.94,,,optional_live
+rub-018,fundamental,pass,204.45,,,optional_live
+rub-090,fundamental,pass,1115.03,,,optional_live
+rub-019,buy_sell,not_run,,,use --live-orchestrator,live_yfinance
+rub-020,buy_sell,not_run,,,use --live-orchestrator,live_yfinance
+rub-021,buy_sell,not_run,,,use --live-orchestrator,live_yfinance
+rub-022,buy_sell,not_run,,,use --live-orchestrator,live_yfinance
+rub-023,buy_sell,not_run,,,use --live-orchestrator,live_yfinance
+rub-024,buy_sell,not_run,,,use --live-orchestrator,live_yfinance
+rub-025,buy_sell,not_run,,,use --live-orchestrator,live_yfinance
+rub-026,buy_sell,not_run,,,use --live-orchestrator,live_yfinance
+rub-027,buy_sell,not_run,,,use --live-orchestrator,live_yfinance
+rub-028,buy_sell,not_run,,,use --live-orchestrator,live_yfinance
+rub-029,news_sentiment,pass,53556.65,,,network_optional
+rub-030,news_sentiment,pass,32275.55,,,network_optional
+rub-031,news_sentiment,pass,26248.67,,,network_optional
+rub-032,news_sentiment,pass,27557.3,,,network_optional
+rub-033,news_sentiment,pass,31941.58,,,network_optional
+rub-091,news_sentiment,pass,25305.76,,,network_optional
+rub-034,chatbot,pass,,,,static
+rub-035,chatbot,pass,,,,static
+rub-036,chatbot,pass,,,,static
+rub-037,chatbot,pass,,,,static
+rub-038,chatbot,pass,,,,static
+rub-126,chatbot,pass,,,,static
+rub-127,chatbot,pass,,,,static
+rub-128,chatbot,pass,,,,static
+rub-129,chatbot,pass,,,,static
+rub-130,chatbot,pass,,,,static
+rub-039,safety_refusal,pass,,,,static
+rub-040,safety_refusal,pass,,,,static
+rub-041,safety_refusal,pass,,,,static
+rub-042,safety_refusal,pass,,,,static
+rub-043,safety_refusal,pass,,,,static
+rub-044,safety_refusal,pass,,,,static
+rub-045,citation_grounding,pass,,,,static
+rub-046,citation_grounding,pass,,,,static
+rub-047,citation_grounding,pass,,,,static
+rub-048,citation_grounding,pass,,,,static
+rub-049,citation_grounding,pass,,,,static
+rub-050,memory_history,pass,6.15,,,static
+rub-051,memory_history,pass,,,documentation-only case,static
+rub-052,memory_history,pass,4.25,,,static
+rub-053,memory_history,pass,1.67,,,static
+rub-054,multi_model_comparison,not_run,,,use --live-multi,live_llm
+rub-055,multi_model_comparison,not_run,,,use --live-multi,live_llm
+rub-056,multi_model_comparison,not_run,,,use --live-multi,live_llm
+rub-057,multi_model_comparison,not_run,,,use --live-multi,live_llm
+rub-058,multi_model_comparison,not_run,,,use --live-multi,live_llm
+rub-059,multi_model_comparison,not_run,,,use --live-multi,live_llm
+rub-060,multi_model_comparison,not_run,,,use --live-multi,live_llm
+rub-076,multi_model_comparison,not_run,,,use --live-multi,live_llm
+rub-077,multi_model_comparison,not_run,,,use --live-multi,live_llm
+rub-078,multi_model_comparison,not_run,,,use --live-multi,live_llm
+rub-079,multi_model_comparison,not_run,,,use --live-multi,live_llm
+rub-080,multi_model_comparison,not_run,,,use --live-multi,live_llm
+rub-081,multi_model_comparison,not_run,,,use --live-multi,live_llm
+rub-082,multi_model_comparison,not_run,,,use --live-multi,live_llm
+rub-083,multi_model_comparison,not_run,,,use --live-multi,live_llm
+rub-087,multi_model_comparison,not_run,,,use --live-multi,live_llm
+rub-088,multi_model_comparison,not_run,,,use --live-multi,live_llm
+rub-089,multi_model_comparison,not_run,,,use --live-multi,live_llm
+rub-084,agentic_chat,pass,426961.22,,,live_llm
+rub-085,agentic_chat,fail,352489.73,answer_missing_substring:'history',,live_llm
+rub-086,agentic_chat,pass,366635.13,,,live_llm
+rub-061,agentic_rag,not_run,,,use --live-agentic,live_llm
+rub-062,agentic_rag,not_run,,,use --live-agentic,live_llm
+rub-063,agentic_rag,not_run,,,use --live-agentic,live_llm
+rub-064,agentic_rag,not_run,,,use --live-agentic,live_llm
+rub-065,agentic_rag,not_run,,,use --live-agentic,live_llm
+rub-066,agentic_rag,not_run,,,use --live-agentic,live_llm
+rub-067,agentic_rag,not_run,,,use --live-agentic,live_llm
+rub-068,agentic_rag,not_run,,,use --live-agentic,live_llm
+rub-069,agentic_rag,not_run,,,use --live-agentic,live_llm
+rub-070,agentic_rag,not_run,,,use --live-agentic,live_llm
+rub-092,fundamental,pass,272.53,,,optional_live
+rub-103,news_sentiment,pass,78444.39,,,network_optional
+rub-104,news_sentiment,pass,82078.23,,,network_optional
+rub-105,news_sentiment,pass,81925.6,,,network_optional
+rub-106,news_sentiment,pass,79654.47,,,network_optional
+rub-117,market_movers,pass,172300.5,,,network_external
+rub-118,market_movers,pass,3784.57,,,network_external
+rub-119,market_movers,pass,9698.63,,,network_external
+rub-120,market_movers,pass,148507.71,,,network_external
+rub-121,market_movers,pass,61530.34,,,network_external
+rub-122,market_movers,pass,6.13,,,network_external
+rub-123,market_movers,pass,61117.46,,,network_external
+rub-124,market_movers,pass,7.65,,,network_external
+rub-125,market_movers,pass,7.33,,,network_external
+rub-126,market_movers,pass,11.8,,,network_external
+rub-127,market_movers,pass,9469.24,,,network_external
+rub-128,market_movers,pass,3706.9,,,network_external
+rub-129,market_movers,pass,140795.2,,,network_external
+rub-130,market_movers,pass,122695.34,,,network_external
+rub-131,market_movers,pass,56296.76,,,network_external

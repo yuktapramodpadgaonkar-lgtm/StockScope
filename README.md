@@ -474,19 +474,19 @@ The split is an artefact of parallel team development, not an intentional archit
 
 ## Report Artifact Mapping
 
-The following table maps each evaluation claim in the project report to its source script, data file, and generated figure in this repository.
+Committed artifacts live in [`report_artifacts/`](report_artifacts/) and are visible on GitHub.
+Full run history (all stamps) is in `backend/evaluation/results/` (gitignored — local only).
 
-| Report Item | Source Script | Data File | Figure/Output |
-|-------------|---------------|-----------|---------------|
-| Batch eval pass rates (all categories) | `backend/evaluation/run_batch_eval.py` | `backend/evaluation/results/batch_eval_<stamp>.csv` | — |
-| Multi-model latency comparison | `backend/evaluation/run_feature_multimodel_eval.py` + `export_metrics_csv.py` | `backend/evaluation/results/metrics_<stamp>.csv` | `figures/model_metrics_bars_<stamp>.png` |
-| Judge score by task/model | `backend/evaluation/run_feature_multimodel_eval.py --judge` + `plot_judge_score_grouped.py` | `backend/evaluation/results/metrics_<stamp>.csv` | `figures/judge_score_grouped_<stamp>.png` |
-| Latency vs. quality trade-off | `backend/evaluation/plot_latency_judge_tradeoff.py` | `backend/evaluation/results/metrics_<stamp>.csv` | `figures/latency_judge_tradeoff_<stamp>.png` |
-| Safety refusal rate | `backend/evaluation/run_batch_eval.py` | `backend/evaluation/results/batch_eval_<stamp>.csv` (category=safety_refusal) | — |
-| Agentic critic pass/fail rates | `backend/evaluation/run_batch_eval.py --category agentic_rag --live-agentic` | `backend/evaluation/results/batch_eval_<stamp>.csv` (category=agentic_rag) | — |
-| Citation grounding pass rate | `backend/evaluation/run_batch_eval.py` | `backend/evaluation/results/batch_eval_<stamp>.csv` (category=citation_grounding) | — |
+| Report Item | Source Script | Committed Artifact | Notes |
+|-------------|---------------|--------------------|-------|
+| Batch eval pass rates — primary run (72/111) | `backend/evaluation/run_batch_eval.py` | [`report_artifacts/batch_eval_20260519-182113.csv`](report_artifacts/batch_eval_20260519-182113.csv) | `--live-market-data --live-fundamental --live-chat --live-news` |
+| Batch eval pass rates — static-only run (60/111) | `backend/evaluation/run_batch_eval.py` | [`report_artifacts/batch_eval_20260519-174832.csv`](report_artifacts/batch_eval_20260519-174832.csv) | `--live-market-data --live-fundamental` |
+| Safety refusal rate | `backend/evaluation/run_batch_eval.py` | [`report_artifacts/batch_eval_20260519-182113.csv`](report_artifacts/batch_eval_20260519-182113.csv) | filter `category=safety_refusal` (6/6) |
+| Citation grounding pass rate | `backend/evaluation/run_batch_eval.py` | [`report_artifacts/batch_eval_20260519-182113.csv`](report_artifacts/batch_eval_20260519-182113.csv) | filter `category=citation_grounding` (5/5) |
+| Agentic critic pass/fail | `run_batch_eval.py --category agentic_rag --live-agentic` | _(not-run; needs live Gemini key)_ | agentic_rag cases require `--live-agentic` |
+| Multi-model latency / judge scores | `run_feature_multimodel_eval.py` + plot scripts | _(requires Python ≥ 3.10 + live LLMs)_ | scripts: `plot_model_metrics_bars.py`, `plot_judge_score_grouped.py` |
 
-> All `<stamp>` values are `YYYYMMDD-HHMMSS` timestamps from the run. The most recent run files are in `backend/evaluation/results/`.
+> See [`report_artifacts/README.md`](report_artifacts/README.md) for full category breakdown and reproduction commands.
 
 ---
 

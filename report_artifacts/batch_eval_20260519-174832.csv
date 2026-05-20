@@ -1,0 +1,112 @@
+case_id,category,status,latency_ms,error,notes,cost
+rub-001,auth_protected_routes,pass,8.71,,,static
+rub-002,auth_protected_routes,pass,1.33,,,static
+rub-003,auth_protected_routes,pass,1.27,,,static
+rub-004,auth_protected_routes,pass,290.87,,,optional_live
+rub-005,auth_protected_routes,pass,3.26,,,static
+rub-006,market_movers,pass,55131.31,,,network_external
+rub-007,market_movers,pass,3.2,,,network_external
+rub-008,market_movers,pass,3.14,,,network_external
+rub-009,market_movers,pass,3.12,,,network_external
+rub-010,market_movers,pass,2.92,,,network_external
+rub-011,fundamental,pass,225.79,,,optional_live
+rub-012,fundamental,pass,192.86,,,optional_live
+rub-013,fundamental,pass,229.18,,,optional_live
+rub-014,fundamental,pass,194.81,,,optional_live
+rub-015,fundamental,pass,248.72,,,optional_live
+rub-016,fundamental,pass,260.42,,,optional_live
+rub-017,fundamental,pass,267.95,,,optional_live
+rub-018,fundamental,pass,195.81,,,optional_live
+rub-090,fundamental,pass,1272.96,,,optional_live
+rub-019,buy_sell,not_run,,,use --live-orchestrator,live_yfinance
+rub-020,buy_sell,not_run,,,use --live-orchestrator,live_yfinance
+rub-021,buy_sell,not_run,,,use --live-orchestrator,live_yfinance
+rub-022,buy_sell,not_run,,,use --live-orchestrator,live_yfinance
+rub-023,buy_sell,not_run,,,use --live-orchestrator,live_yfinance
+rub-024,buy_sell,not_run,,,use --live-orchestrator,live_yfinance
+rub-025,buy_sell,not_run,,,use --live-orchestrator,live_yfinance
+rub-026,buy_sell,not_run,,,use --live-orchestrator,live_yfinance
+rub-027,buy_sell,not_run,,,use --live-orchestrator,live_yfinance
+rub-028,buy_sell,not_run,,,use --live-orchestrator,live_yfinance
+rub-029,news_sentiment,not_run,,,use --live-news,network_optional
+rub-030,news_sentiment,not_run,,,use --live-news,network_optional
+rub-031,news_sentiment,not_run,,,use --live-news,network_optional
+rub-032,news_sentiment,not_run,,,use --live-news,network_optional
+rub-033,news_sentiment,not_run,,,use --live-news,network_optional
+rub-091,news_sentiment,not_run,,,use --live-news,network_optional
+rub-034,chatbot,pass,,,,static
+rub-035,chatbot,pass,,,,static
+rub-036,chatbot,pass,,,,static
+rub-037,chatbot,pass,,,,static
+rub-038,chatbot,pass,,,,static
+rub-126,chatbot,pass,,,,static
+rub-127,chatbot,pass,,,,static
+rub-128,chatbot,pass,,,,static
+rub-129,chatbot,pass,,,,static
+rub-130,chatbot,pass,,,,static
+rub-039,safety_refusal,pass,,,,static
+rub-040,safety_refusal,pass,,,,static
+rub-041,safety_refusal,pass,,,,static
+rub-042,safety_refusal,pass,,,,static
+rub-043,safety_refusal,pass,,,,static
+rub-044,safety_refusal,pass,,,,static
+rub-045,citation_grounding,pass,,,,static
+rub-046,citation_grounding,pass,,,,static
+rub-047,citation_grounding,pass,,,,static
+rub-048,citation_grounding,pass,,,,static
+rub-049,citation_grounding,pass,,,,static
+rub-050,memory_history,pass,6.89,,,static
+rub-051,memory_history,pass,,,documentation-only case,static
+rub-052,memory_history,pass,3.2,,,static
+rub-053,memory_history,pass,1.87,,,static
+rub-054,multi_model_comparison,not_run,,,use --live-multi,live_llm
+rub-055,multi_model_comparison,not_run,,,use --live-multi,live_llm
+rub-056,multi_model_comparison,not_run,,,use --live-multi,live_llm
+rub-057,multi_model_comparison,not_run,,,use --live-multi,live_llm
+rub-058,multi_model_comparison,not_run,,,use --live-multi,live_llm
+rub-059,multi_model_comparison,not_run,,,use --live-multi,live_llm
+rub-060,multi_model_comparison,not_run,,,use --live-multi,live_llm
+rub-076,multi_model_comparison,not_run,,,use --live-multi,live_llm
+rub-077,multi_model_comparison,not_run,,,use --live-multi,live_llm
+rub-078,multi_model_comparison,not_run,,,use --live-multi,live_llm
+rub-079,multi_model_comparison,not_run,,,use --live-multi,live_llm
+rub-080,multi_model_comparison,not_run,,,use --live-multi,live_llm
+rub-081,multi_model_comparison,not_run,,,use --live-multi,live_llm
+rub-082,multi_model_comparison,not_run,,,use --live-multi,live_llm
+rub-083,multi_model_comparison,not_run,,,use --live-multi,live_llm
+rub-087,multi_model_comparison,not_run,,,use --live-multi,live_llm
+rub-088,multi_model_comparison,not_run,,,use --live-multi,live_llm
+rub-089,multi_model_comparison,not_run,,,use --live-multi,live_llm
+rub-084,agentic_chat,not_run,,,use --live-chat,live_llm
+rub-085,agentic_chat,not_run,,,use --live-chat,live_llm
+rub-086,agentic_chat,not_run,,,use --live-chat,live_llm
+rub-061,agentic_rag,not_run,,,use --live-agentic,live_llm
+rub-062,agentic_rag,not_run,,,use --live-agentic,live_llm
+rub-063,agentic_rag,not_run,,,use --live-agentic,live_llm
+rub-064,agentic_rag,not_run,,,use --live-agentic,live_llm
+rub-065,agentic_rag,not_run,,,use --live-agentic,live_llm
+rub-066,agentic_rag,not_run,,,use --live-agentic,live_llm
+rub-067,agentic_rag,not_run,,,use --live-agentic,live_llm
+rub-068,agentic_rag,not_run,,,use --live-agentic,live_llm
+rub-069,agentic_rag,not_run,,,use --live-agentic,live_llm
+rub-070,agentic_rag,not_run,,,use --live-agentic,live_llm
+rub-092,fundamental,pass,196.91,,,optional_live
+rub-103,news_sentiment,not_run,,,use --live-news,network_optional
+rub-104,news_sentiment,not_run,,,use --live-news,network_optional
+rub-105,news_sentiment,not_run,,,use --live-news,network_optional
+rub-106,news_sentiment,not_run,,,use --live-news,network_optional
+rub-117,market_movers,pass,171539.36,,,network_external
+rub-118,market_movers,pass,4087.35,,,network_external
+rub-119,market_movers,pass,9236.48,,,network_external
+rub-120,market_movers,pass,127491.5,,,network_external
+rub-121,market_movers,pass,57628.37,,,network_external
+rub-122,market_movers,pass,4.69,,,network_external
+rub-123,market_movers,pass,60461.2,,,network_external
+rub-124,market_movers,pass,4.8,,,network_external
+rub-125,market_movers,pass,4.67,,,network_external
+rub-126,market_movers,pass,5.31,,,network_external
+rub-127,market_movers,pass,8862.25,,,network_external
+rub-128,market_movers,pass,3775.1,,,network_external
+rub-129,market_movers,pass,211338.51,,,network_external
+rub-130,market_movers,pass,124448.25,,,network_external
+rub-131,market_movers,pass,73048.79,,,network_external
